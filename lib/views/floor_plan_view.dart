@@ -26,23 +26,28 @@ class FloorPlanPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.blue
-      ..strokeWidth = 2
+    final roomsPaint = Paint()
+      ..color = Colors.black12
+      ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
 
-    if (floorBase != null) {
-      Rect rect = Rect.fromLTWH(floorBase!.position.dx, floorBase!.position.dy,
-          floorBase!.width * 10, floorBase!.height * 10);
-      canvas.drawRect(rect, paint);
-    }
+    final basePaint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 5
+      ..style = PaintingStyle.stroke;
 
     if (rooms.isNotEmpty) {
       for (Room room in rooms) {
         Rect rect = Rect.fromLTWH(room.position.dx, room.position.dy,
             room.width * 10, room.height * 10);
-        canvas.drawRect(rect, paint);
+        canvas.drawRect(rect, roomsPaint);
       }
+    }
+
+    if (floorBase != null) {
+      Rect rect = Rect.fromLTWH(floorBase!.position.dx, floorBase!.position.dy,
+          floorBase!.width * 10, floorBase!.height * 10);
+      canvas.drawRect(rect, basePaint);
     }
   }
 

@@ -8,20 +8,22 @@ import '../models/room_model.dart';
 class FloorPlanController {
   FloorBase? _floorBase;
   final List<Room> _rooms = [];
-  final double defaultRoomWidth = 100;
-  final double defaultRoomHeight = 100;
-  final Offset defaultRoomPosition = const Offset(51, 51);
-  final double defaultBaseWidth = 300;
-  final double defaultBaseHeight = 200;
-  final Offset defaultBasePosition = const Offset(50, 50);
 
   void setDefaultBase() {
+    const double defaultBaseWidth = 30.5;
+    const double defaultBaseHeight = 60;
+    const Offset defaultBasePosition = Offset(40, 35);
+
     _floorBase =
         FloorBase(defaultBaseWidth, defaultBaseHeight, defaultBasePosition);
   }
 
   void addDefaultRoom() {
-    _rooms.add(Room(defaultRoomWidth, defaultRoomHeight, defaultRoomPosition));
+    const double defaultRoomWidth = 10;
+    const double defaultRoomHeight = 10;
+    const Offset defaultRoomPosition = Offset(40, 35);
+
+    addRoom(defaultRoomWidth, defaultRoomHeight, defaultRoomPosition);
   }
 
   void setBase(double width, double height, Offset position) {
@@ -31,16 +33,15 @@ class FloorPlanController {
   void addRoom(double width, double height, Offset position) {
     if (_floorBase != null) {
       // check if the room fits within the base
-
       if (_roomFitsWithinTheBase(width, height, position)) {
         _rooms.add(Room(width, height, position));
       } else {
-        Fluttertoast.showToast(
-            msg: "Room does not fit within the defined Base.");
+        Fluttertoast.showToast(msg: "Room does not fit within the  Base.");
       }
     } else {
       Fluttertoast.showToast(msg: "Base is not set yet.");
     }
+    print(_rooms);
   }
 
   bool _roomFitsWithinTheBase(double roomWidth, roomHeight, Offset position) {
@@ -58,6 +59,10 @@ class FloorPlanController {
         roomBottom <= baseBottom);
   }
 
+  bool _roomDoesNotOverlapWithOtherRooms() {
+    return false;
+  }
+
   List<Room> getRooms() {
     return _rooms;
   }
@@ -68,6 +73,14 @@ class FloorPlanController {
 
   void removeAllRooms() {
     _rooms.clear();
+  }
+
+  void removeBase() {
+    if (_rooms.isNotEmpty) {
+      removeAllRooms();
+    }
+    print("Base removed");
+    _floorBase = null;
   }
 
   void removeLastAddedRoom() {
