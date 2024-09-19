@@ -6,9 +6,9 @@ class SpeechToTextService {
 
   Future<void> listen(void Function(String command) onCommandRecognized) async {
     bool available = await _speech.initialize();
-    Fluttertoast.showToast(msg: "Started Listening.");
 
     if (available) {
+      Fluttertoast.showToast(msg: "Started Listening.");
       _speech.listen(
         listenOptions: SpeechListenOptions(partialResults: false),
         onResult: (result) {
@@ -16,7 +16,7 @@ class SpeechToTextService {
           onCommandRecognized(result.recognizedWords.toLowerCase());
         },
       );
-    }
+    } else {}
   }
 
   void stopListening() {

@@ -16,6 +16,7 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   final FloorPlanController _floorPlanController = FloorPlanController();
   final SpeechToTextService _speechService = SpeechToTextService();
+  bool _isListening = false;
 
   // AnimationController? _animationController;
   // Animation<double>? _fadeAnimation;
@@ -76,6 +77,8 @@ class _HomeViewState extends State<HomeView> {
     } else {
       Fluttertoast.showToast(msg: "Invalid Command.");
     }
+    _isListening = false;
+    setState(() {});
   }
 
   // void _onCommandRecognized(String command) {
@@ -84,11 +87,21 @@ class _HomeViewState extends State<HomeView> {
   // }
 
   void _startListening() {
+    _isListening = true;
+    setState(() {});
     _speechService.listen(_onCommand);
+    if (_isListening) {
+    } else {
+      Fluttertoast.showToast(msg: "Cannot listen due to an error");
+    }
   }
 
   void _stopListening() {
     _speechService.stopListening();
+    setState(() {
+      _isListening = false;
+    });
+    Fluttertoast.showToast(msg: "Stopped listening, manually.");
   }
 
   @override
@@ -111,17 +124,11 @@ class _HomeViewState extends State<HomeView> {
       body: Column(
         children: [
           Expanded(child: FloorPlanView(controller: _floorPlanController)),
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: _startListening,
-                child: const Text("Start Listening"),
-              ),
-              ElevatedButton(
-                onPressed: _stopListening,
-                child: const Text("Stop Listening"),
-              ),
-            ],
+          ElevatedButton(
+            onPressed: _isListening ? _stopListening : _startListening,
+            child: _isListening
+                ? const Text("Stop Listening")
+                : const Text("Start Listening"),
           ),
         ],
       ),
