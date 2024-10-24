@@ -23,6 +23,7 @@ class FloorPlanView extends StatelessWidget {
 class FloorPlanPainter extends CustomPainter {
   final List<Room> rooms;
   final FloorBase? floorBase;
+  static const double SCALE_FACTOR = 10.0;
 
   FloorPlanPainter(this.rooms, this.floorBase);
 
@@ -45,81 +46,87 @@ class FloorPlanPainter extends CustomPainter {
       ..color = Colors.black12
       ..style = PaintingStyle.fill;
 
-    // TextStyle for room names and dimensions
-    const TextStyle roomTextStyle =
-        TextStyle(color: Colors.black, fontSize: 14);
-
-    // Draw rooms with their names and dimensions at the center
-    if (rooms.isNotEmpty) {
-      for (int i = 0; i < rooms.length; i++) {
-        Room room = rooms[i];
-        Rect rect = Rect.fromLTWH(room.position.dx, room.position.dy,
-            room.width * 10, room.height * 10);
-        canvas.drawRect(rect, roomPaint);
-
-        // Calculate the center of the room
-        final roomCenterX = room.position.dx + (room.width * 10) / 2;
-        final roomCenterY = room.position.dy + (room.height * 10) / 2;
-
-        // Create text for room name and dimensions
-        String roomText = "Room ${i + 1} \n ${room.width} x ${room.height}";
-        TextSpan roomTextSpan = TextSpan(text: roomText, style: roomTextStyle);
-        TextPainter roomTextPainter =
-            TextPainter(text: roomTextSpan, textDirection: TextDirection.ltr);
-        roomTextPainter.layout();
-
-        // Draw the room name and dimensions at the center of the room
-        roomTextPainter.paint(
-            canvas,
-            Offset(roomCenterX - roomTextPainter.width / 2,
-                roomCenterY - roomTextPainter.height / 2));
-      }
-    }
+    const TextStyle roomTextStyle = TextStyle(
+      color: Colors.black,
+      fontSize: 14,
+    );
 
     // Draw base if present
     if (floorBase != null) {
-      final baseWidthInPixels = floorBase!.width * 10;
-      final baseHeightInPixels = floorBase!.height * 10;
+      final baseWidthInPixels = floorBase!.width * SCALE_FACTOR;
+      final baseHeightInPixels = floorBase!.height * SCALE_FACTOR;
 
-      // Draw the base
-      Rect rect = Rect.fromLTWH(
-          screenCenterX - (baseWidthInPixels / 2),
-          screenCenterY - (baseHeightInPixels / 2),
-          baseWidthInPixels,
-          baseHeightInPixels);
-      Rect rectFill = Rect.fromLTWH(
-          screenCenterX - (baseWidthInPixels / 2),
-          screenCenterY - (baseHeightInPixels / 2),
-          baseWidthInPixels,
-          baseHeightInPixels);
-      canvas.drawRect(rect, basePaint);
-      canvas.drawRect(rectFill, baseFillPaint);
+      // Calculate base position relative to screen center
+      final baseLeft = screenCenterX - (baseWidthInPixels / 2);
+      final baseTop = screenCenterY - (baseHeightInPixels / 2);
 
-      // Create TextPainter for base name and dimensions
-      TextStyle baseTextStyle =
-          const TextStyle(color: Colors.black, fontSize: 16);
+      final baseRect = Rect.fromLTWH(
+        baseLeft,
+        baseTop,
+        baseWidthInPixels,
+        baseHeightInPixels,
+      );
+
+      canvas.drawRect(baseRect, baseFillPaint);
+      canvas.drawRect(baseRect, basePaint);
+
+      // Draw rooms
+      for (int i = 0; i < rooms.length; i++) {
+        Room room = rooms[i];
+
+        // Convert room position to screen coordinates
+        final roomLeft = baseLeft + (room.position.dx * SCALE_FACTOR);
+        final roomTop = baseTop + (room.position.dy * SCALE_FACTOR);
+
+        final roomRect = Rect.fromLTWH(
+          roomLeft,
+          roomTop,
+          room.width * SCALE_FACTOR,
+          room.height * SCALE_FACTOR,
+        );
+
+        canvas.drawRect(roomRect, roomPaint);
+
+        // Draw room label
+        final roomCenterX = roomLeft + (room.width * SCALE_FACTOR / 2);
+        final roomCenterY = roomTop + (room.height * SCALE_FACTOR / 2);
+
+        final roomText = "Room ${i + 1}\n${room.width} x ${room.height}";
+        final roomTextSpan = TextSpan(text: roomText, style: roomTextStyle);
+        final roomTextPainter = TextPainter(
+          text: roomTextSpan,
+          textDirection: TextDirection.ltr,
+          textAlign: TextAlign.center,
+        );
+
+        roomTextPainter.layout(
+            minWidth: 0, maxWidth: room.width * SCALE_FACTOR);
+        roomTextPainter.paint(
+          canvas,
+          Offset(
+            roomCenterX - roomTextPainter.width / 2,
+            roomCenterY - roomTextPainter.height / 2,
+          ),
+        );
+      }
+
+      // Draw base dimensions
+      const baseTextStyle = TextStyle(color: Colors.black, fontSize: 16);
+      final baseDimensions = "${floorBase!.width} x ${floorBase!.height}";
+      final baseTextSpan = TextSpan(text: baseDimensions, style: baseTextStyle);
       final baseTextPainter = TextPainter(
-        text: TextSpan(text: "Base", style: baseTextStyle),
+        text: baseTextSpan,
         textDirection: TextDirection.ltr,
       );
+
       baseTextPainter.layout();
-
-      final baseDimensionsPainter = TextPainter(
-        text: TextSpan(
-            text: "${floorBase!.width} x ${floorBase!.height}",
-            style: baseTextStyle),
-        textDirection: TextDirection.ltr,
+      baseTextPainter.paint(
+        canvas,
+        Offset(
+          screenCenterX - baseTextPainter.width / 2,
+          baseTop - baseTextPainter.height - 10,
+        ),
       );
-      baseDimensionsPainter.layout();
-
-      // Draw base text outside the base (top-center)
-      double baseTextX = screenCenterX - baseTextPainter.width / 2;
-      double baseTextY =
-          screenCenterY - baseHeightInPixels / 2 - baseTextPainter.height - 20;
-
-      baseTextPainter.paint(canvas, Offset(baseTextX, baseTextY));
-      baseDimensionsPainter.paint(
-          canvas, Offset(baseTextX, baseTextY + baseTextPainter.height));
     }
   }
 
