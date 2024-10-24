@@ -17,6 +17,7 @@ class _HomeViewState extends State<HomeView> {
   final FloorPlanController _floorPlanController = FloorPlanController();
   final SpeechToTextService _speechService = SpeechToTextService();
   bool _isListening = false;
+  final _controller = TextEditingController();
 
   // AnimationController? _animationController;
   // Animation<double>? _fadeAnimation;
@@ -51,7 +52,8 @@ class _HomeViewState extends State<HomeView> {
       } else {
         Fluttertoast.showToast(msg: "Please specify what you want to remove.");
       }
-    } else if (tokens.contains("base") && tokens.contains("by")) {
+    } else if (tokens.contains("base") &&
+        (tokens.contains("by") || tokens.contains("/"))) {
       Map<String, double> dimensions =
           VoiceCommandController().extractMeasurements(command);
       if (dimensions.isNotEmpty) {
@@ -114,6 +116,12 @@ class _HomeViewState extends State<HomeView> {
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -130,6 +138,15 @@ class _HomeViewState extends State<HomeView> {
                 ? const Text("Stop Listening")
                 : const Text("Start Listening"),
           ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _controller,
+              decoration:
+                  const InputDecoration(hintText: "Enter command here..."),
+              onSubmitted: null,
+            ),
+          )
         ],
       ),
     );

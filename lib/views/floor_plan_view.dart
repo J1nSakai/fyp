@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
@@ -34,7 +32,7 @@ class FloorPlanPainter extends CustomPainter {
     final screenCenterY = size.height / 2;
 
     final roomPaint = Paint()
-      ..color = Colors.black12
+      ..color = Colors.purple
       ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
 
@@ -47,63 +45,43 @@ class FloorPlanPainter extends CustomPainter {
       ..color = Colors.black12
       ..style = PaintingStyle.fill;
 
+    // TextStyle for room names and dimensions
+    const TextStyle roomTextStyle =
+        TextStyle(color: Colors.black, fontSize: 14);
+
+    // Draw rooms with their names and dimensions at the center
     if (rooms.isNotEmpty) {
-      for (Room room in rooms) {
+      for (int i = 0; i < rooms.length; i++) {
+        Room room = rooms[i];
         Rect rect = Rect.fromLTWH(room.position.dx, room.position.dy,
             room.width * 10, room.height * 10);
         canvas.drawRect(rect, roomPaint);
+
+        // Calculate the center of the room
+        final roomCenterX = room.position.dx + (room.width * 10) / 2;
+        final roomCenterY = room.position.dy + (room.height * 10) / 2;
+
+        // Create text for room name and dimensions
+        String roomText = "Room ${i + 1} \n ${room.width} x ${room.height}";
+        TextSpan roomTextSpan = TextSpan(text: roomText, style: roomTextStyle);
+        TextPainter roomTextPainter =
+            TextPainter(text: roomTextSpan, textDirection: TextDirection.ltr);
+        roomTextPainter.layout();
+
+        // Draw the room name and dimensions at the center of the room
+        roomTextPainter.paint(
+            canvas,
+            Offset(roomCenterX - roomTextPainter.width / 2,
+                roomCenterY - roomTextPainter.height / 2));
       }
     }
 
+    // Draw base if present
     if (floorBase != null) {
       final baseWidthInPixels = floorBase!.width * 10;
       final baseHeightInPixels = floorBase!.height * 10;
 
-      // ParagraphStyle baseParagraphStyle = ParagraphStyle(fontSize: 18);
-      TextStyle textStyle = const TextStyle(color: Colors.black, fontSize: 16);
-      // ParagraphBuilder baseParagraphBuilder =
-      //     ParagraphBuilder(baseParagraphStyle);
-      // baseParagraphBuilder
-      //     .addText("Base\n${floorBase!.width}ft x ${floorBase!.height}ft");
-      // Paragraph baseParagraph = baseParagraphBuilder.build();
-      // baseParagraph.layout(ParagraphConstraints(width: size.width));
-
-      // canvas.drawParagraph(
-      //     baseParagraph,
-      //     Offset(
-      //         screenCenterX, screenCenterY - (baseHeightInPixels / 2)));
-
-      // Create a TextPainter for "Base"
-      final baseTextPainter = TextPainter(
-        text: TextSpan(text: "Base", style: textStyle),
-        textDirection: TextDirection.ltr,
-      );
-      baseTextPainter.layout();
-
-      // Create a TextPainter for the base dimensions (e.g., "300 x 200")
-      final dimensionsTextPainter = TextPainter(
-        text: TextSpan(
-            text: "${floorBase!.width} x ${floorBase!.height}",
-            style: textStyle),
-        textDirection: TextDirection.ltr,
-      );
-      dimensionsTextPainter.layout();
-
-      // Position the text above the rectangle's top boundary
-      double textX = floorBase!.position.dx +
-          (floorBase!.width - baseTextPainter.width) / 2;
-      double textY = floorBase!.position.dy -
-          baseTextPainter.height -
-          dimensionsTextPainter.height -
-          10; // Small padding above the base
-
-      // Draw the "Base" text
-      baseTextPainter.paint(canvas, Offset(textX, textY));
-
-      // Draw the dimensions text below "Base"
-      dimensionsTextPainter.paint(
-          canvas, Offset(textX, textY + baseTextPainter.height));
-
+      // Draw the base
       Rect rect = Rect.fromLTWH(
           screenCenterX - (baseWidthInPixels / 2),
           screenCenterY - (baseHeightInPixels / 2),
@@ -116,6 +94,32 @@ class FloorPlanPainter extends CustomPainter {
           baseHeightInPixels);
       canvas.drawRect(rect, basePaint);
       canvas.drawRect(rectFill, baseFillPaint);
+
+      // Create TextPainter for base name and dimensions
+      TextStyle baseTextStyle =
+          const TextStyle(color: Colors.black, fontSize: 16);
+      final baseTextPainter = TextPainter(
+        text: TextSpan(text: "Base", style: baseTextStyle),
+        textDirection: TextDirection.ltr,
+      );
+      baseTextPainter.layout();
+
+      final baseDimensionsPainter = TextPainter(
+        text: TextSpan(
+            text: "${floorBase!.width} x ${floorBase!.height}",
+            style: baseTextStyle),
+        textDirection: TextDirection.ltr,
+      );
+      baseDimensionsPainter.layout();
+
+      // Draw base text outside the base (top-center)
+      double baseTextX = screenCenterX - baseTextPainter.width / 2;
+      double baseTextY =
+          screenCenterY - baseHeightInPixels / 2 - baseTextPainter.height - 20;
+
+      baseTextPainter.paint(canvas, Offset(baseTextX, baseTextY));
+      baseDimensionsPainter.paint(
+          canvas, Offset(baseTextX, baseTextY + baseTextPainter.height));
     }
   }
 
