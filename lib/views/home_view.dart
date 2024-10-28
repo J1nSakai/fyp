@@ -94,9 +94,17 @@ class _HomeViewState extends State<HomeView> {
 
   // HomeView.dart
   void _handleRoomCommand(String command, List tokens) {
-    // Check if base exists first
     if (_floorPlanController.getBase() == null) {
       Fluttertoast.showToast(msg: "Please create a base first");
+      return;
+    }
+
+    // Handle relative positioning commands
+    if (tokens.contains("below") ||
+        tokens.contains("above") ||
+        tokens.contains("right") ||
+        tokens.contains("left")) {
+      _handleRelativeRoomCommand(command, tokens);
       return;
     }
 
@@ -151,6 +159,71 @@ class _HomeViewState extends State<HomeView> {
     if (text.isNotEmpty) {
       _onCommand(text);
       _controller.clear();
+    }
+  }
+
+  void _handleRelativeRoomCommand(String command, List tokens) {
+    // Extract reference room number
+    int? referenceRoomIndex;
+    String? position;
+
+    // Find the position word (below/above/right/left)
+    for (String pos in ['below', 'above', 'right', 'left']) {
+      if (tokens.contains(pos)) {
+        position = pos;
+        break;
+      }
+    }
+
+    // Find room number (e.g., "room 1" or "room1")
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "room") {
+        if (i + 1 < tokens.length) {
+          referenceRoomIndex = int.tryParse(tokens[i + 1]);
+          if (referenceRoomIndex != null) {
+            referenceRoomIndex -= 1; // Convert to 0-based index
+          }
+        }
+      } else if (tokens[i].startsWith("room")) {
+        String numStr = tokens[i].substring(4);
+        referenceRoomIndex = int.tryParse(numStr);
+        if (referenceRoomIndex != null) {
+          referenceRoomIndex -= 1; // Convert to 0-based index
+        }
+      }
+    }
+
+    if (referenceRoomIndex == null || position == null) {
+      Fluttertoast.showToast(
+          msg: "Please specify a valid room number and position");
+      return;
+    }
+
+    // Handle dimensions
+    if (tokens.contains("by") || tokens.contains("/")) {
+      Map<String, double> dimensions =
+          VoiceCommandController().extractMeasurements(command);
+      if (dimensions.isNotEmpty) {
+        setState(() {
+          _floorPlanController.addRoomRelativeTo(dimensions['width']!,
+              dimensions['height']!, referenceRoomIndex!, position!);
+          Fluttertoast.showToast(
+              msg: "Added room $position room ${referenceRoomIndex + 1}");
+        });
+      } else {
+        Fluttertoast.showToast(msg: "Could not understand room dimensions");
+      }
+    } else {
+      // Use default dimensions
+      setState(() {
+        _floorPlanController.addRoomRelativeTo(
+            10, // default width
+            10, // default height
+            referenceRoomIndex!,
+            position!);
+        Fluttertoast.showToast(
+            msg: "Added default room $position room ${referenceRoomIndex + 1}");
+      });
     }
   }
 

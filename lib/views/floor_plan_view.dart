@@ -1,6 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
+import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
+import 'package:saysketch_v2/models/window.dart';
 
 import '../models/room_model.dart';
 
@@ -23,7 +27,7 @@ class FloorPlanView extends StatelessWidget {
 class FloorPlanPainter extends CustomPainter {
   final List<Room> rooms;
   final FloorBase? floorBase;
-  static const double SCALE_FACTOR = 10.0;
+  static const double scaleFactor = 10.0;
 
   FloorPlanPainter(this.rooms, this.floorBase);
 
@@ -33,13 +37,23 @@ class FloorPlanPainter extends CustomPainter {
     final screenCenterY = size.height / 2;
 
     final roomPaint = Paint()
-      ..color = Colors.purple
+      ..color = Colors.black
       ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final doorPaint = Paint()
+      ..color = Colors.brown
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    final windowPaint = Paint()
+      ..color = Colors.blue
+      ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
     final basePaint = Paint()
       ..color = Colors.black
-      ..strokeWidth = 5
+      ..strokeWidth = 7
       ..style = PaintingStyle.stroke;
 
     final baseFillPaint = Paint()
@@ -53,8 +67,8 @@ class FloorPlanPainter extends CustomPainter {
 
     // Draw base if present
     if (floorBase != null) {
-      final baseWidthInPixels = floorBase!.width * SCALE_FACTOR;
-      final baseHeightInPixels = floorBase!.height * SCALE_FACTOR;
+      final baseWidthInPixels = floorBase!.width * scaleFactor;
+      final baseHeightInPixels = floorBase!.height * scaleFactor;
 
       // Calculate base position relative to screen center
       final baseLeft = screenCenterX - (baseWidthInPixels / 2);
@@ -75,23 +89,23 @@ class FloorPlanPainter extends CustomPainter {
         Room room = rooms[i];
 
         // Convert room position to screen coordinates
-        final roomLeft = baseLeft + (room.position.dx * SCALE_FACTOR);
-        final roomTop = baseTop + (room.position.dy * SCALE_FACTOR);
+        final roomLeft = baseLeft + (room.position.dx * scaleFactor);
+        final roomTop = baseTop + (room.position.dy * scaleFactor);
 
         final roomRect = Rect.fromLTWH(
           roomLeft,
           roomTop,
-          room.width * SCALE_FACTOR,
-          room.height * SCALE_FACTOR,
+          room.width * scaleFactor,
+          room.height * scaleFactor,
         );
 
         canvas.drawRect(roomRect, roomPaint);
 
         // Draw room label
-        final roomCenterX = roomLeft + (room.width * SCALE_FACTOR / 2);
-        final roomCenterY = roomTop + (room.height * SCALE_FACTOR / 2);
+        final roomCenterX = roomLeft + (room.width * scaleFactor / 2);
+        final roomCenterY = roomTop + (room.height * scaleFactor / 2);
 
-        final roomText = "Room ${i + 1}\n${room.width} x ${room.height}";
+        final roomText = "${room.name}\n${room.width} x ${room.height}";
         final roomTextSpan = TextSpan(text: roomText, style: roomTextStyle);
         final roomTextPainter = TextPainter(
           text: roomTextSpan,
@@ -99,8 +113,7 @@ class FloorPlanPainter extends CustomPainter {
           textAlign: TextAlign.center,
         );
 
-        roomTextPainter.layout(
-            minWidth: 0, maxWidth: room.width * SCALE_FACTOR);
+        roomTextPainter.layout(minWidth: 0, maxWidth: room.width * scaleFactor);
         roomTextPainter.paint(
           canvas,
           Offset(
@@ -108,6 +121,34 @@ class FloorPlanPainter extends CustomPainter {
             roomCenterY - roomTextPainter.height / 2,
           ),
         );
+      }
+
+      // After drawing rooms, draw their doors and windows
+      for (final room in rooms) {
+        final roomLeft = baseLeft + (room.position.dx * scaleFactor);
+        final roomTop = baseTop + (room.position.dy * scaleFactor);
+
+        // Draw doors
+        for (final door in room.doors) {
+          _drawDoor(
+            canvas,
+            door,
+            roomLeft,
+            roomTop,
+            doorPaint,
+          );
+        }
+
+        // Draw windows
+        for (final window in room.windows) {
+          _drawWindow(
+            canvas,
+            window,
+            roomLeft,
+            roomTop,
+            windowPaint,
+          );
+        }
       }
 
       // Draw base dimensions
@@ -128,6 +169,110 @@ class FloorPlanPainter extends CustomPainter {
         ),
       );
     }
+  }
+
+  void _drawDoor(
+    Canvas canvas,
+    Door door,
+    double roomLeft,
+    double roomTop,
+    Paint doorPaint,
+  ) {
+    final startX = roomLeft + (door.position.dx * scaleFactor);
+    final startY = roomTop + (door.position.dy * scaleFactor);
+
+    // Draw door frame
+    final rect = Rect.fromLTWH(
+      startX,
+      startY,
+      door.width * scaleFactor,
+      door.length * scaleFactor,
+    );
+
+    canvas.save();
+    canvas.translate(startX, startY);
+    canvas.rotate(door.angle);
+
+    // Draw the door frame
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, door.width * scaleFactor, door.length * scaleFactor),
+      doorPaint,
+    );
+
+    // Draw door swing arc
+    final arcRect = Rect.fromLTWH(
+      door.opensInward ? 0 : -door.width * scaleFactor,
+      0,
+      door.width * scaleFactor * 2,
+      door.width * scaleFactor * 2,
+    );
+
+    canvas.drawArc(
+      arcRect,
+      door.opensInward ? -pi / 2 : pi / 2,
+      pi / 2,
+      false,
+      doorPaint,
+    );
+
+    canvas.restore();
+  }
+
+  void _drawWindow(
+    Canvas canvas,
+    Window window,
+    double roomLeft,
+    double roomTop,
+    Paint windowPaint,
+  ) {
+    final startX = roomLeft + (window.position.dx * scaleFactor);
+    final startY = roomTop + (window.position.dy * scaleFactor);
+
+    canvas.save();
+    canvas.translate(startX, startY);
+    canvas.rotate(window.angle);
+
+    // Draw window frame
+    canvas.drawRect(
+      Rect.fromLTWH(
+        0,
+        0,
+        window.width * scaleFactor,
+        window.length * scaleFactor,
+      ),
+      windowPaint,
+    );
+
+    // Draw window panes
+    final paneSpacing = window.width * scaleFactor / 3;
+    canvas.drawLine(
+      Offset(paneSpacing, 0),
+      Offset(paneSpacing, window.length * scaleFactor),
+      windowPaint,
+    );
+    canvas.drawLine(
+      Offset(paneSpacing * 2, 0),
+      Offset(paneSpacing * 2, window.length * scaleFactor),
+      windowPaint,
+    );
+
+    // Draw window sill if needed
+    if (window.hasWindowSill) {
+      final sillWidth = window.width * scaleFactor * 1.2;
+      final sillOffset = (sillWidth - window.width * scaleFactor) / 2;
+
+      canvas.drawRect(
+        Rect.fromLTWH(
+          -sillOffset,
+          window.length * scaleFactor,
+          sillWidth,
+          scaleFactor * 0.2,
+        ),
+        windowPaint,
+      );
+    }
+
+    canvas.restore();
   }
 
   @override

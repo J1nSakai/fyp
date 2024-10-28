@@ -7,12 +7,12 @@ class FloorPlanController {
   FloorBase? _floorBase;
   final List<Room> _rooms = [];
 
-  static const double SCALE_FACTOR = 10.0;
-  static const double ROOM_SPACING = 0.0; // 1 unit spacing between rooms
+  static const double scaleFactor = 10.0;
+  static const double roomSpacing = 0.0; //  unit spacing between rooms
 
   void setDefaultBase() {
-    const double defaultBaseWidth = 30.5;
-    const double defaultBaseHeight = 60;
+    const double defaultBaseWidth = 80;
+    const double defaultBaseHeight = 50;
     const Offset defaultBasePosition = Offset(0, 0);
 
     _floorBase =
@@ -29,7 +29,7 @@ class FloorPlanController {
     const double defaultRoomHeight = 10;
 
     // For the first room, position it in the top-left corner with some margin
-    const defaultRoomPosition = Offset(ROOM_SPACING, ROOM_SPACING);
+    const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
 
     addRoom(defaultRoomWidth, defaultRoomHeight, defaultRoomPosition);
   }
@@ -43,7 +43,7 @@ class FloorPlanController {
 
     if (_rooms.isEmpty) {
       // For the first room, position it in the top-left corner with some margin
-      const defaultRoomPosition = Offset(ROOM_SPACING, ROOM_SPACING);
+      const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
       addRoom(width, height, defaultRoomPosition);
       return;
     }
@@ -73,7 +73,7 @@ class FloorPlanController {
 
     // 1. Try position to the right
     Offset rightPosition = Offset(
-        lastRoom.position.dx + lastRoom.width + ROOM_SPACING,
+        lastRoom.position.dx + lastRoom.width + roomSpacing,
         lastRoom.position.dy);
 
     if (_roomFitsWithinBase(roomWidth, roomHeight, rightPosition) &&
@@ -84,7 +84,7 @@ class FloorPlanController {
 
     // 2. Try position to the left
     Offset leftPosition = Offset(
-        lastRoom.position.dx - roomWidth - ROOM_SPACING, lastRoom.position.dy);
+        lastRoom.position.dx - roomWidth - roomSpacing, lastRoom.position.dy);
 
     if (_roomFitsWithinBase(roomWidth, roomHeight, leftPosition) &&
         _roomDoesNotOverlapWithOtherRooms(
@@ -94,7 +94,7 @@ class FloorPlanController {
 
     // 3. Try position below
     Offset bottomPosition = Offset(lastRoom.position.dx,
-        lastRoom.position.dy + lastRoom.height + ROOM_SPACING);
+        lastRoom.position.dy + lastRoom.height + roomSpacing);
 
     if (_roomFitsWithinBase(roomWidth, roomHeight, bottomPosition) &&
         _roomDoesNotOverlapWithOtherRooms(
@@ -110,11 +110,11 @@ class FloorPlanController {
     if (_floorBase == null) return null;
 
     // Start from the top of the base with some margin
-    double currentY = ROOM_SPACING;
+    double currentY = roomSpacing;
 
     while (currentY + roomHeight <= _floorBase!.height) {
       // Try placing rooms from left to right in each row
-      double currentX = ROOM_SPACING;
+      double currentX = roomSpacing;
 
       while (currentX + roomWidth <= _floorBase!.width) {
         Offset testPosition = Offset(currentX, currentY);
@@ -124,10 +124,10 @@ class FloorPlanController {
           return testPosition;
         }
 
-        currentX += roomWidth + ROOM_SPACING;
+        currentX += roomWidth + roomSpacing;
       }
 
-      currentY += roomHeight + ROOM_SPACING;
+      currentY += roomHeight + roomSpacing;
     }
 
     return null;
@@ -145,12 +145,63 @@ class FloorPlanController {
 
     if (_roomFitsWithinBase(width, height, position)) {
       if (_roomDoesNotOverlapWithOtherRooms(width, height, position)) {
-        _rooms.add(Room(width, height, position));
+        int roomNo = _rooms.length + 1;
+        _rooms.add(Room(width, height, position, "Room $roomNo"));
       } else {
         Fluttertoast.showToast(msg: "Room overlaps with existing rooms.");
       }
     } else {
       Fluttertoast.showToast(msg: "Room must be completely inside the base.");
+    }
+  }
+
+  // In FloorPlanController class, add these new methods:
+
+  void addRoomRelativeTo(
+      double width, double height, int referenceRoomIndex, String position) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Please create a base first");
+      return;
+    }
+
+    if (referenceRoomIndex < 0 || referenceRoomIndex >= _rooms.length) {
+      Fluttertoast.showToast(msg: "Invalid room reference number");
+      return;
+    }
+
+    Room referenceRoom = _rooms[referenceRoomIndex];
+    Offset? newPosition;
+
+    switch (position) {
+      case "below":
+        newPosition = Offset(referenceRoom.position.dx,
+            referenceRoom.position.dy + referenceRoom.height + roomSpacing);
+        break;
+      case "above":
+        newPosition = Offset(referenceRoom.position.dx,
+            referenceRoom.position.dy - height - roomSpacing);
+        break;
+      case "right":
+        newPosition = Offset(
+            referenceRoom.position.dx + referenceRoom.width + roomSpacing,
+            referenceRoom.position.dy);
+        break;
+      case "left":
+        newPosition = Offset(referenceRoom.position.dx - width - roomSpacing,
+            referenceRoom.position.dy);
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid position specified");
+        return;
+    }
+
+    if (_roomFitsWithinBase(width, height, newPosition) &&
+        _roomDoesNotOverlapWithOtherRooms(width, height, newPosition)) {
+      addRoom(width, height, newPosition);
+    } else {
+      Fluttertoast.showToast(
+          msg:
+              "Cannot place room at specified position. Check for overlaps or base boundaries.");
     }
   }
 
@@ -168,13 +219,13 @@ class FloorPlanController {
       double roomWidth, double roomHeight, Offset position) {
     for (final existingRoom in _rooms) {
       // Add a small buffer around rooms
-      bool overlaps = !(position.dx + roomWidth + ROOM_SPACING <=
+      bool overlaps = !(position.dx + roomWidth + roomSpacing <=
               existingRoom.position.dx ||
           position.dx >=
-              existingRoom.position.dx + existingRoom.width + ROOM_SPACING ||
-          position.dy + roomHeight + ROOM_SPACING <= existingRoom.position.dy ||
+              existingRoom.position.dx + existingRoom.width + roomSpacing ||
+          position.dy + roomHeight + roomSpacing <= existingRoom.position.dy ||
           position.dy >=
-              existingRoom.position.dy + existingRoom.height + ROOM_SPACING);
+              existingRoom.position.dy + existingRoom.height + roomSpacing);
 
       if (overlaps) return false;
     }
