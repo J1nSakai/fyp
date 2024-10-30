@@ -9,7 +9,7 @@ class Room {
   final Offset position;
   final List<Door> doors;
   final List<Window> windows;
-  final String name;
+  String name;
 
   Room(
     this.width,
@@ -20,4 +20,10 @@ class Room {
     List<Window>? windows,
   })  : doors = doors ?? [],
         windows = windows ?? [];
+
+  @override
+  String toString() {
+    // TODO: implement toString
+    return "{width: $width, height: $height, position: ${position.dx}x${position.dy}, name: $name}";
+  }
 }

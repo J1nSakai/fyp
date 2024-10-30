@@ -6,8 +6,11 @@ import '../models/room_model.dart';
 class FloorPlanController {
   FloorBase? _floorBase;
   final List<Room> _rooms = [];
+  int _roomCounter = 0;
 
-  static const double scaleFactor = 10.0;
+  Room? selectedRoom;
+  String? selectedRoomName;
+
   static const double roomSpacing = 0.0; //  unit spacing between rooms
 
   void setDefaultBase() {
@@ -145,8 +148,8 @@ class FloorPlanController {
 
     if (_roomFitsWithinBase(width, height, position)) {
       if (_roomDoesNotOverlapWithOtherRooms(width, height, position)) {
-        int roomNo = _rooms.length + 1;
-        _rooms.add(Room(width, height, position, "Room $roomNo"));
+        _roomCounter++;
+        _rooms.add(Room(width, height, position, "room $_roomCounter"));
       } else {
         Fluttertoast.showToast(msg: "Room overlaps with existing rooms.");
       }
@@ -241,6 +244,7 @@ class FloorPlanController {
   }
 
   void removeAllRooms() {
+    _roomCounter = 0;
     _rooms.clear();
   }
 
@@ -252,6 +256,34 @@ class FloorPlanController {
   void removeLastAddedRoom() {
     if (_rooms.isNotEmpty) {
       _rooms.removeLast();
+      _roomCounter--;
     }
+  }
+
+  Room? selectRoom(String name) {
+    for (var room in _rooms) {
+      if (room.name == name) {
+        selectedRoom = room;
+        selectedRoomName = room.name;
+        return room;
+      }
+    }
+    selectedRoom = null;
+    selectedRoomName = null;
+    return null;
+  }
+
+  void deselectRoom() {
+    selectedRoom = null;
+    selectedRoomName = null;
+  }
+
+  void renameRoom(String name) {
+    selectedRoom!.name = name;
+  }
+
+  void removeSelectedRoom() {
+    _rooms.remove(selectedRoom);
+    deselectRoom();
   }
 }

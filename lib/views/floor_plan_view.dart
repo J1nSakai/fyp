@@ -16,7 +16,8 @@ class FloorPlanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: FloorPlanPainter(controller.getRooms(), controller.getBase()),
+      painter: FloorPlanPainter(controller.getRooms(), controller.getBase(),
+          controller.selectedRoomName),
       size: Size(MediaQuery.of(context).size.width,
           MediaQuery.of(context).size.height),
       child: Container(),
@@ -27,9 +28,10 @@ class FloorPlanView extends StatelessWidget {
 class FloorPlanPainter extends CustomPainter {
   final List<Room> rooms;
   final FloorBase? floorBase;
+  String? selectedRoomName;
   static const double scaleFactor = 10.0;
 
-  FloorPlanPainter(this.rooms, this.floorBase);
+  FloorPlanPainter(this.rooms, this.floorBase, this.selectedRoomName);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -105,7 +107,8 @@ class FloorPlanPainter extends CustomPainter {
         final roomCenterX = roomLeft + (room.width * scaleFactor / 2);
         final roomCenterY = roomTop + (room.height * scaleFactor / 2);
 
-        final roomText = "${room.name}\n${room.width} x ${room.height}";
+        final roomText =
+            "${room.name[0].toUpperCase()}${room.name.substring(1)}\n${room.width} x ${room.height}";
         final roomTextSpan = TextSpan(text: roomText, style: roomTextStyle);
         final roomTextPainter = TextPainter(
           text: roomTextSpan,
@@ -121,6 +124,17 @@ class FloorPlanPainter extends CustomPainter {
             roomCenterY - roomTextPainter.height / 2,
           ),
         );
+
+        if (selectedRoomName != null) {
+          if (room.name == selectedRoomName) {
+            final highlightPaint = Paint()
+              ..color = Colors.blue
+              ..strokeWidth = 3
+              ..style = PaintingStyle.stroke;
+
+            canvas.drawRect(roomRect, highlightPaint);
+          }
+        }
       }
 
       // After drawing rooms, draw their doors and windows
@@ -195,7 +209,7 @@ class FloorPlanPainter extends CustomPainter {
 
     // Draw the door frame
     canvas.drawRect(
-      Rect.fromLTWH(0, 0, door.width * scaleFactor, door.length * scaleFactor),
+      rect,
       doorPaint,
     );
 

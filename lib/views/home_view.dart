@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
 import 'package:saysketch_v2/controllers/voice_command_controller.dart';
+import 'package:saysketch_v2/models/room_model.dart';
 import 'package:saysketch_v2/services/speech_to_text_service.dart';
 import 'floor_plan_view.dart';
 
@@ -17,6 +18,7 @@ class _HomeViewState extends State<HomeView> {
   final SpeechToTextService _speechService = SpeechToTextService();
   bool _isListening = false;
   final _controller = TextEditingController();
+  Room? selectedRoom;
 
   void _onCommand(String command) {
     // Convert command to lowercase for easier comparison
@@ -32,6 +34,29 @@ class _HomeViewState extends State<HomeView> {
     // Handle base creation commands
     else if (tokens.contains("base")) {
       _handleBaseCommand(command, tokens);
+    } else if (tokens.contains("select")) {
+      _handleSelectCommand(tokens);
+    } else if (tokens.contains("deselect")) {
+      selectedRoom = null;
+      _floorPlanController.deselectRoom();
+    } else if (tokens.contains("rename")) {
+      if (tokens.length != 1) {
+        if (tokens.contains("to")) {
+          _handleRenameRoomCommand(tokens.sublist(2));
+        } else {
+          _handleRenameRoomCommand(tokens.sublist(1));
+        }
+      } else {
+        if (selectedRoom == null) {
+          Fluttertoast.showToast(
+            msg: "Please select a room first.",
+          );
+        } else {
+          Fluttertoast.showToast(
+            msg: "Please specify the new name for the selected room.",
+          );
+        }
+      }
     }
     // Handle room commands
     else if (tokens.contains("room") || tokens.contains("rooms")) {
@@ -46,25 +71,59 @@ class _HomeViewState extends State<HomeView> {
   }
 
   void _handleRemoveCommand(List tokens) {
-    if (tokens.contains("base")) {
-      setState(() {
-        _floorPlanController.removeBase();
-        Fluttertoast.showToast(msg: "Base removed");
-      });
-    } else if (tokens.contains("rooms") || tokens.contains("all")) {
-      setState(() {
-        _floorPlanController.removeAllRooms();
-        Fluttertoast.showToast(msg: "All rooms removed");
-      });
-    } else if (tokens.contains("last") &&
-        (tokens.contains("room") || tokens.contains("rooms"))) {
-      setState(() {
-        _floorPlanController.removeLastAddedRoom();
-        Fluttertoast.showToast(msg: "Last room removed");
-      });
+    if (selectedRoom == null) {
+      if (tokens.contains("base")) {
+        setState(() {
+          _floorPlanController.removeBase();
+          Fluttertoast.showToast(msg: "Base removed");
+        });
+      } else if (tokens.contains("rooms") || tokens.contains("all")) {
+        setState(() {
+          _floorPlanController.removeAllRooms();
+          Fluttertoast.showToast(msg: "All rooms removed");
+        });
+      } else if (tokens.contains("last") &&
+          (tokens.contains("room") || tokens.contains("rooms"))) {
+        setState(() {
+          _floorPlanController.removeLastAddedRoom();
+          Fluttertoast.showToast(msg: "Last room removed");
+        });
+      } else {
+        Fluttertoast.showToast(
+            msg: "Please specify what to remove (base, rooms, or last room)");
+      }
     } else {
+      _floorPlanController.removeSelectedRoom();
+      selectedRoom = null;
+    }
+  }
+
+  void _handleSelectCommand(List tokens) {
+    if (tokens.length == 1) {
       Fluttertoast.showToast(
-          msg: "Please specify what to remove (base, rooms, or last room)");
+          msg: "Please specify the room name to select that room.");
+      return;
+    }
+
+    selectedRoom = null;
+
+    String roomName = "";
+    for (int i = 1; i < tokens.length; i++) {
+      roomName += tokens[i] + " ";
+    }
+
+    selectedRoom = _floorPlanController.selectRoom(roomName.trim());
+  }
+
+  void _handleRenameRoomCommand(List tokens) {
+    if (selectedRoom != null) {
+      String roomName = "";
+      for (int i = 0; i < tokens.length; i++) {
+        roomName += tokens[i] + " ";
+      }
+      _floorPlanController.renameRoom(roomName.trim());
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room first.");
     }
   }
 
@@ -241,40 +300,45 @@ class _HomeViewState extends State<HomeView> {
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(child: FloorPlanView(controller: _floorPlanController)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          Column(
             children: [
-              ElevatedButton(
-                onPressed: _isListening ? _stopListening : _startListening,
-                child:
-                    Text(_isListening ? "Stop Listening" : "Start Listening"),
+              Expanded(child: FloorPlanView(controller: _floorPlanController)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: _isListening ? _stopListening : _startListening,
+                    child: Text(
+                        _isListening ? "Stop Listening" : "Start Listening"),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _floorPlanController.addNextRoom(),
+                    child: const Text("Add Next Room"),
+                  ),
+                ],
               ),
-              ElevatedButton(
-                onPressed: () => _floorPlanController.addNextRoom(),
-                child: const Text("Add Next Room"),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
+                  controller: _controller,
+                  decoration: const InputDecoration(
+                    hintText: "Enter command here...",
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: _handleTextCommand,
+                  autofocus: true,
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  "Commands: 'create base', 'add room', 'another room', 'remove base', 'remove rooms', 'remove last room'",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ),
             ],
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: "Enter command here...",
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: _handleTextCommand,
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              "Commands: 'create base', 'add room', 'another room', 'remove base', 'remove rooms', 'remove last room'",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
           ),
         ],
       ),
