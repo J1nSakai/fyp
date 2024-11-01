@@ -55,7 +55,7 @@ class FloorPlanPainter extends CustomPainter {
 
     final basePaint = Paint()
       ..color = Colors.black
-      ..strokeWidth = 7
+      ..strokeWidth = 6
       ..style = PaintingStyle.stroke;
 
     final baseFillPaint = Paint()
@@ -87,9 +87,7 @@ class FloorPlanPainter extends CustomPainter {
       canvas.drawRect(baseRect, basePaint);
 
       // Draw rooms
-      for (int i = 0; i < rooms.length; i++) {
-        Room room = rooms[i];
-
+      for (Room room in rooms) {
         // Convert room position to screen coordinates
         final roomLeft = baseLeft + (room.position.dx * scaleFactor);
         final roomTop = baseTop + (room.position.dy * scaleFactor);
@@ -108,7 +106,7 @@ class FloorPlanPainter extends CustomPainter {
         final roomCenterY = roomTop + (room.height * scaleFactor / 2);
 
         final roomText =
-            "${room.name[0].toUpperCase()}${room.name.substring(1)}\n${room.width} x ${room.height}";
+            "${room.name[0].toUpperCase()}${room.name.substring(1)}\n${room.width}ft x ${room.height}ft";
         final roomTextSpan = TextSpan(text: roomText, style: roomTextStyle);
         final roomTextPainter = TextPainter(
           text: roomTextSpan,
@@ -167,7 +165,7 @@ class FloorPlanPainter extends CustomPainter {
 
       // Draw base dimensions
       const baseTextStyle = TextStyle(color: Colors.black, fontSize: 16);
-      final baseDimensions = "${floorBase!.width} x ${floorBase!.height}";
+      final baseDimensions = "${floorBase!.width}ft x ${floorBase!.height}ft";
       final baseTextSpan = TextSpan(text: baseDimensions, style: baseTextStyle);
       final baseTextPainter = TextPainter(
         text: baseTextSpan,

@@ -1,4 +1,4 @@
-class VoiceCommandController {
+class CommandController {
   Map<String, double> extractMeasurements(String command) {
     RegExp regExp = RegExp(
         r'(\d+)\s*(feet|meters|foot)?\s*by\s*(\d+)\s*(feet|meters|foot)?');

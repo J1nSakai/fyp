@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
-import 'package:saysketch_v2/controllers/voice_command_controller.dart';
+import 'package:saysketch_v2/controllers/command_controller.dart';
 import 'package:saysketch_v2/models/room_model.dart';
 import 'package:saysketch_v2/services/speech_to_text_service.dart';
 import 'floor_plan_view.dart';
@@ -23,7 +23,7 @@ class _HomeViewState extends State<HomeView> {
   void _onCommand(String command) {
     // Convert command to lowercase for easier comparison
     command = command.toLowerCase();
-    List tokens = command.split(" ");
+    List<String> tokens = command.split(" ");
 
     print("Recognized command: $command"); // Debug print
 
@@ -57,6 +57,91 @@ class _HomeViewState extends State<HomeView> {
           );
         }
       }
+    } else if (tokens.contains("move")) {
+      if (selectedRoom == null) {
+        Fluttertoast.showToast(msg: "Please select a room first");
+        return;
+      }
+
+      // Handle predefined positions (center, topleft, etc.)
+      if (tokens.contains("to")) {
+        for (String position in [
+          "center",
+          "topleft",
+          "topright",
+          "bottomleft",
+          "bottomright"
+        ]) {
+          if (tokens.contains(position)) {
+            _floorPlanController.moveRoomToPosition(position);
+            return;
+          }
+        }
+
+        // Handle "move to the <direction> of room X"
+        int roomIndex = _findReferenceRoomIndex(tokens);
+        if (roomIndex != -1) {
+          for (String direction in [
+            "right",
+            "left",
+            "above",
+            "below",
+            "north",
+            "south",
+            "east",
+            "west"
+          ]) {
+            if (tokens.contains(direction)) {
+              _floorPlanController.moveRoomRelativeToOther(
+                  roomIndex, direction);
+              return;
+            }
+          }
+        }
+      }
+
+      // Handle relative movements with units
+      // e.g., "move 5 feet to the right", "move 2 meters north"
+      double? distance = _extractDistance(tokens);
+      if (distance != null) {
+        for (String direction in [
+          "right",
+          "left",
+          "up",
+          "down",
+          "north",
+          "south",
+          "east",
+          "west"
+        ]) {
+          if (tokens.contains(direction)) {
+            _floorPlanController.moveRoomRelative(distance, direction);
+            return;
+          }
+        }
+      }
+
+      // Handle absolute coordinates
+      try {
+        int xIndex = tokens.indexOf("x");
+        int yIndex = tokens.indexOf("y");
+
+        if (xIndex != -1 &&
+            yIndex != -1 &&
+            xIndex + 1 < tokens.length &&
+            yIndex + 1 < tokens.length) {
+          double x = double.parse(tokens[xIndex + 1]);
+          double y = double.parse(tokens[yIndex + 1]);
+          _floorPlanController.moveRoom(x, y);
+          return;
+        }
+      } catch (e) {
+        // Handle parsing errors
+      }
+
+      Fluttertoast.showToast(
+          msg:
+              "Invalid move command. Try: 'move to center', 'move 5 feet right', 'move to the right of room 1'");
     }
     // Handle room commands
     else if (tokens.contains("room") || tokens.contains("rooms")) {
@@ -68,6 +153,33 @@ class _HomeViewState extends State<HomeView> {
     setState(() {
       _isListening = false;
     });
+  }
+
+  double? _extractDistance(List<String> tokens) {
+    for (int i = 0; i < tokens.length - 1; i++) {
+      try {
+        double value = double.parse(tokens[i]);
+        String unit = tokens[i + 1];
+        return _floorPlanController.convertToMetricUnits(value, unit);
+      } catch (e) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  int _findReferenceRoomIndex(List<String> tokens) {
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "room" && i + 1 < tokens.length) {
+        try {
+          int roomNumber = int.parse(tokens[i + 1]);
+          return roomNumber - 1; // Convert to 0-based index
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    return -1;
   }
 
   void _handleRemoveCommand(List tokens) {
@@ -130,7 +242,7 @@ class _HomeViewState extends State<HomeView> {
   void _handleBaseCommand(String command, List tokens) {
     if (tokens.contains("by") || tokens.contains("/")) {
       Map<String, double> dimensions =
-          VoiceCommandController().extractMeasurements(command);
+          CommandController().extractMeasurements(command);
       if (dimensions.isNotEmpty) {
         setState(() {
           _floorPlanController.setBase(
@@ -170,7 +282,7 @@ class _HomeViewState extends State<HomeView> {
     // Handle room with specific dimensions
     if (tokens.contains("by") || tokens.contains("/")) {
       Map<String, double> dimensions =
-          VoiceCommandController().extractMeasurements(command);
+          CommandController().extractMeasurements(command);
       if (dimensions.isNotEmpty) {
         setState(() {
           _floorPlanController.addNextRoomWithDimensions(
@@ -261,7 +373,7 @@ class _HomeViewState extends State<HomeView> {
     // Handle dimensions
     if (tokens.contains("by") || tokens.contains("/")) {
       Map<String, double> dimensions =
-          VoiceCommandController().extractMeasurements(command);
+          CommandController().extractMeasurements(command);
       if (dimensions.isNotEmpty) {
         setState(() {
           _floorPlanController.addRoomRelativeTo(dimensions['width']!,
