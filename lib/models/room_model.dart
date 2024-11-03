@@ -4,8 +4,8 @@ import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/window.dart';
 
 class Room {
-  final double width;
-  final double height;
+  double width;
+  double height;
   Offset position;
   final List<Door> doors;
   final List<Window> windows;

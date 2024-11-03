@@ -2,9 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
-import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
-import 'package:saysketch_v2/models/window.dart';
+import 'package:saysketch_v2/models/stairs.dart';
 
 import '../models/room_model.dart';
 
@@ -16,8 +15,12 @@ class FloorPlanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: FloorPlanPainter(controller.getRooms(), controller.getBase(),
-          controller.selectedRoomName),
+      painter: FloorPlanPainter(
+          controller.getRooms(),
+          controller.getStairs(),
+          controller.getBase(),
+          controller.selectedRoomName,
+          controller.selectedStairs),
       size: Size(MediaQuery.of(context).size.width,
           MediaQuery.of(context).size.height),
       child: Container(),
@@ -27,11 +30,14 @@ class FloorPlanView extends StatelessWidget {
 
 class FloorPlanPainter extends CustomPainter {
   final List<Room> rooms;
+  final List<Stairs> stairs;
   final FloorBase? floorBase;
   String? selectedRoomName;
+  Stairs? selectedStairs;
   static const double scaleFactor = 10.0;
 
-  FloorPlanPainter(this.rooms, this.floorBase, this.selectedRoomName);
+  FloorPlanPainter(this.rooms, this.stairs, this.floorBase,
+      this.selectedRoomName, this.selectedStairs);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -41,16 +47,6 @@ class FloorPlanPainter extends CustomPainter {
     final roomPaint = Paint()
       ..color = Colors.black
       ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-
-    final doorPaint = Paint()
-      ..color = Colors.brown
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final windowPaint = Paint()
-      ..color = Colors.blue
-      ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
     final basePaint = Paint()
@@ -136,32 +132,6 @@ class FloorPlanPainter extends CustomPainter {
       }
 
       // After drawing rooms, draw their doors and windows
-      for (final room in rooms) {
-        final roomLeft = baseLeft + (room.position.dx * scaleFactor);
-        final roomTop = baseTop + (room.position.dy * scaleFactor);
-
-        // Draw doors
-        for (final door in room.doors) {
-          _drawDoor(
-            canvas,
-            door,
-            roomLeft,
-            roomTop,
-            doorPaint,
-          );
-        }
-
-        // Draw windows
-        for (final window in room.windows) {
-          _drawWindow(
-            canvas,
-            window,
-            roomLeft,
-            roomTop,
-            windowPaint,
-          );
-        }
-      }
 
       // Draw base dimensions
       const baseTextStyle = TextStyle(color: Colors.black, fontSize: 16);
@@ -181,110 +151,100 @@ class FloorPlanPainter extends CustomPainter {
         ),
       );
     }
-  }
 
-  void _drawDoor(
-    Canvas canvas,
-    Door door,
-    double roomLeft,
-    double roomTop,
-    Paint doorPaint,
-  ) {
-    final startX = roomLeft + (door.position.dx * scaleFactor);
-    final startY = roomTop + (door.position.dy * scaleFactor);
+    for (Stairs stair in stairs) {
+      final baseWidthInPixels = floorBase!.width * scaleFactor;
+      final baseHeightInPixels = floorBase!.height * scaleFactor;
 
-    // Draw door frame
-    final rect = Rect.fromLTWH(
-      startX,
-      startY,
-      door.width * scaleFactor,
-      door.length * scaleFactor,
-    );
+      final baseLeft = screenCenterX - (baseWidthInPixels / 2);
+      final baseTop = screenCenterY - (baseHeightInPixels / 2);
+      final stairLeft = baseLeft + (stair.position.dx * scaleFactor);
+      final stairTop = baseTop + (stair.position.dy * scaleFactor);
 
-    canvas.save();
-    canvas.translate(startX, startY);
-    canvas.rotate(door.angle);
-
-    // Draw the door frame
-    canvas.drawRect(
-      rect,
-      doorPaint,
-    );
-
-    // Draw door swing arc
-    final arcRect = Rect.fromLTWH(
-      door.opensInward ? 0 : -door.width * scaleFactor,
-      0,
-      door.width * scaleFactor * 2,
-      door.width * scaleFactor * 2,
-    );
-
-    canvas.drawArc(
-      arcRect,
-      door.opensInward ? -pi / 2 : pi / 2,
-      pi / 2,
-      false,
-      doorPaint,
-    );
-
-    canvas.restore();
-  }
-
-  void _drawWindow(
-    Canvas canvas,
-    Window window,
-    double roomLeft,
-    double roomTop,
-    Paint windowPaint,
-  ) {
-    final startX = roomLeft + (window.position.dx * scaleFactor);
-    final startY = roomTop + (window.position.dy * scaleFactor);
-
-    canvas.save();
-    canvas.translate(startX, startY);
-    canvas.rotate(window.angle);
-
-    // Draw window frame
-    canvas.drawRect(
-      Rect.fromLTWH(
-        0,
-        0,
-        window.width * scaleFactor,
-        window.length * scaleFactor,
-      ),
-      windowPaint,
-    );
-
-    // Draw window panes
-    final paneSpacing = window.width * scaleFactor / 3;
-    canvas.drawLine(
-      Offset(paneSpacing, 0),
-      Offset(paneSpacing, window.length * scaleFactor),
-      windowPaint,
-    );
-    canvas.drawLine(
-      Offset(paneSpacing * 2, 0),
-      Offset(paneSpacing * 2, window.length * scaleFactor),
-      windowPaint,
-    );
-
-    // Draw window sill if needed
-    if (window.hasWindowSill) {
-      final sillWidth = window.width * scaleFactor * 1.2;
-      final sillOffset = (sillWidth - window.width * scaleFactor) / 2;
-
-      canvas.drawRect(
-        Rect.fromLTWH(
-          -sillOffset,
-          window.length * scaleFactor,
-          sillWidth,
-          scaleFactor * 0.2,
-        ),
-        windowPaint,
+      final stairRect = Rect.fromLTWH(
+        stairLeft,
+        stairTop,
+        stair.width * scaleFactor,
+        stair.length * scaleFactor,
       );
-    }
 
-    canvas.restore();
+      // Draw stairs outline
+      final stairPaint = Paint()
+        ..color = Colors.black
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawRect(stairRect, stairPaint);
+
+      // Draw step lines
+      final stepPaint = Paint()
+        ..color = Colors.black
+        ..strokeWidth = 1;
+
+      final stepHeight = stair.length / stair.numberOfSteps;
+
+      for (int i = 1; i < stair.numberOfSteps; i++) {
+        final y = stairTop + (i * stepHeight * scaleFactor);
+        canvas.drawLine(
+          Offset(stairLeft, y),
+          Offset(stairLeft + (stair.width * scaleFactor), y),
+          stepPaint,
+        );
+      }
+
+      // Draw direction arrow
+      final arrowPaint = Paint()
+        ..color = Colors.black
+        ..strokeWidth = 2;
+
+      final centerX = stairLeft + (stair.width * scaleFactor / 2);
+      final centerY = stairTop + (stair.length * scaleFactor / 2);
+      final arrowSize = min(stair.width, stair.length) * scaleFactor * 0.3;
+
+      if (stair.direction == "up") {
+        canvas.drawLine(
+          Offset(centerX, centerY + arrowSize),
+          Offset(centerX, centerY - arrowSize),
+          arrowPaint,
+        );
+        canvas.drawLine(
+          Offset(centerX, centerY - arrowSize),
+          Offset(centerX - arrowSize * 0.5, centerY - arrowSize * 0.5),
+          arrowPaint,
+        );
+        canvas.drawLine(
+          Offset(centerX, centerY - arrowSize),
+          Offset(centerX + arrowSize * 0.5, centerY - arrowSize * 0.5),
+          arrowPaint,
+        );
+      } else {
+        canvas.drawLine(
+          Offset(centerX, centerY - arrowSize),
+          Offset(centerX, centerY + arrowSize),
+          arrowPaint,
+        );
+        canvas.drawLine(
+          Offset(centerX, centerY + arrowSize),
+          Offset(centerX - arrowSize * 0.5, centerY + arrowSize * 0.5),
+          arrowPaint,
+        );
+        canvas.drawLine(
+          Offset(centerX, centerY + arrowSize),
+          Offset(centerX + arrowSize * 0.5, centerY + arrowSize * 0.5),
+          arrowPaint,
+        );
+      }
+
+      // Highlight selected stairs
+      if (selectedStairs == stair) {
+        final highlightPaint = Paint()
+          ..color = Colors.blue
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke;
+
+        canvas.drawRect(stairRect, highlightPaint);
+      }
+    }
   }
 
   @override
