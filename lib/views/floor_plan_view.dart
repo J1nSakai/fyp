@@ -44,11 +44,6 @@ class FloorPlanPainter extends CustomPainter {
     final screenCenterX = size.width / 2;
     final screenCenterY = size.height / 2;
 
-    final roomPaint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-
     final basePaint = Paint()
       ..color = Colors.black
       ..strokeWidth = 6
@@ -95,7 +90,7 @@ class FloorPlanPainter extends CustomPainter {
           room.height * scaleFactor,
         );
 
-        canvas.drawRect(roomRect, roomPaint);
+        canvas.drawRect(roomRect, room.roomPaint);
 
         // Draw room label
         final roomCenterX = roomLeft + (room.width * scaleFactor / 2);
@@ -121,12 +116,8 @@ class FloorPlanPainter extends CustomPainter {
 
         if (selectedRoomName != null) {
           if (room.name == selectedRoomName) {
-            final highlightPaint = Paint()
-              ..color = Colors.blue
-              ..strokeWidth = 3
-              ..style = PaintingStyle.stroke;
-
-            canvas.drawRect(roomRect, highlightPaint);
+            room.roomPaint.color = Colors.red;
+            canvas.drawRect(roomRect, room.roomPaint);
           }
         }
       }
@@ -181,15 +172,34 @@ class FloorPlanPainter extends CustomPainter {
         ..color = Colors.black
         ..strokeWidth = 1;
 
-      final stepHeight = stair.length / stair.numberOfSteps;
+      switch (stair.direction) {
+        case "up":
+        case "down":
+          // Horizontal steps for up/down stairs
+          final stepHeight = stair.length / stair.numberOfSteps;
+          for (int i = 1; i < stair.numberOfSteps; i++) {
+            final y = stairTop + (i * stepHeight * scaleFactor);
+            canvas.drawLine(
+              Offset(stairLeft, y),
+              Offset(stairLeft + (stair.width * scaleFactor), y),
+              stepPaint,
+            );
+          }
+          break;
 
-      for (int i = 1; i < stair.numberOfSteps; i++) {
-        final y = stairTop + (i * stepHeight * scaleFactor);
-        canvas.drawLine(
-          Offset(stairLeft, y),
-          Offset(stairLeft + (stair.width * scaleFactor), y),
-          stepPaint,
-        );
+        case "left":
+        case "right":
+          // Vertical steps for left/right stairs
+          final stepWidth = stair.width / stair.numberOfSteps;
+          for (int i = 1; i < stair.numberOfSteps; i++) {
+            final x = stairLeft + (i * stepWidth * scaleFactor);
+            canvas.drawLine(
+              Offset(x, stairTop),
+              Offset(x, stairTop + (stair.length * scaleFactor)),
+              stepPaint,
+            );
+          }
+          break;
       }
 
       // Draw direction arrow
@@ -201,38 +211,86 @@ class FloorPlanPainter extends CustomPainter {
       final centerY = stairTop + (stair.length * scaleFactor / 2);
       final arrowSize = min(stair.width, stair.length) * scaleFactor * 0.3;
 
-      if (stair.direction == "up") {
-        canvas.drawLine(
-          Offset(centerX, centerY + arrowSize),
-          Offset(centerX, centerY - arrowSize),
-          arrowPaint,
-        );
-        canvas.drawLine(
-          Offset(centerX, centerY - arrowSize),
-          Offset(centerX - arrowSize * 0.5, centerY - arrowSize * 0.5),
-          arrowPaint,
-        );
-        canvas.drawLine(
-          Offset(centerX, centerY - arrowSize),
-          Offset(centerX + arrowSize * 0.5, centerY - arrowSize * 0.5),
-          arrowPaint,
-        );
-      } else {
-        canvas.drawLine(
-          Offset(centerX, centerY - arrowSize),
-          Offset(centerX, centerY + arrowSize),
-          arrowPaint,
-        );
-        canvas.drawLine(
-          Offset(centerX, centerY + arrowSize),
-          Offset(centerX - arrowSize * 0.5, centerY + arrowSize * 0.5),
-          arrowPaint,
-        );
-        canvas.drawLine(
-          Offset(centerX, centerY + arrowSize),
-          Offset(centerX + arrowSize * 0.5, centerY + arrowSize * 0.5),
-          arrowPaint,
-        );
+      switch (stair.direction) {
+        case "up":
+          // Draw vertical line up
+          canvas.drawLine(
+            Offset(centerX, centerY + arrowSize),
+            Offset(centerX, centerY - arrowSize),
+            arrowPaint,
+          );
+          // Draw arrow head
+          canvas.drawLine(
+            Offset(centerX, centerY - arrowSize),
+            Offset(centerX - arrowSize * 0.5, centerY - arrowSize * 0.5),
+            arrowPaint,
+          );
+          canvas.drawLine(
+            Offset(centerX, centerY - arrowSize),
+            Offset(centerX + arrowSize * 0.5, centerY - arrowSize * 0.5),
+            arrowPaint,
+          );
+          break;
+
+        case "down":
+          // Draw vertical line down
+          canvas.drawLine(
+            Offset(centerX, centerY - arrowSize),
+            Offset(centerX, centerY + arrowSize),
+            arrowPaint,
+          );
+          // Draw arrow head
+          canvas.drawLine(
+            Offset(centerX, centerY + arrowSize),
+            Offset(centerX - arrowSize * 0.5, centerY + arrowSize * 0.5),
+            arrowPaint,
+          );
+          canvas.drawLine(
+            Offset(centerX, centerY + arrowSize),
+            Offset(centerX + arrowSize * 0.5, centerY + arrowSize * 0.5),
+            arrowPaint,
+          );
+          break;
+
+        case "left":
+          // Draw horizontal line left
+          canvas.drawLine(
+            Offset(centerX + arrowSize, centerY),
+            Offset(centerX - arrowSize, centerY),
+            arrowPaint,
+          );
+          // Draw arrow head
+          canvas.drawLine(
+            Offset(centerX - arrowSize, centerY),
+            Offset(centerX - arrowSize * 0.5, centerY - arrowSize * 0.5),
+            arrowPaint,
+          );
+          canvas.drawLine(
+            Offset(centerX - arrowSize, centerY),
+            Offset(centerX - arrowSize * 0.5, centerY + arrowSize * 0.5),
+            arrowPaint,
+          );
+          break;
+
+        case "right":
+          // Draw horizontal line right
+          canvas.drawLine(
+            Offset(centerX - arrowSize, centerY),
+            Offset(centerX + arrowSize, centerY),
+            arrowPaint,
+          );
+          // Draw arrow head
+          canvas.drawLine(
+            Offset(centerX + arrowSize, centerY),
+            Offset(centerX + arrowSize * 0.5, centerY - arrowSize * 0.5),
+            arrowPaint,
+          );
+          canvas.drawLine(
+            Offset(centerX + arrowSize, centerY),
+            Offset(centerX + arrowSize * 0.5, centerY + arrowSize * 0.5),
+            arrowPaint,
+          );
+          break;
       }
 
       // Highlight selected stairs

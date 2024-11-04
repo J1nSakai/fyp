@@ -1,7 +1,8 @@
-import 'dart:ui';
+import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
 import 'package:saysketch_v2/models/stairs.dart';
+import 'package:saysketch_v2/services/message_service.dart';
 import '../models/room_model.dart';
 
 class FloorPlanController {
@@ -14,6 +15,8 @@ class FloorPlanController {
   Stairs? selectedStairs;
   Room? selectedRoom;
   String? selectedRoomName;
+
+  late Color originalColor;
 
   static const double roomSpacing = 0.0; //  unit spacing between rooms
 
@@ -48,7 +51,7 @@ class FloorPlanController {
       return;
     }
 
-    if (_rooms.isEmpty) {
+    if (_rooms.isEmpty && _stairs.isEmpty) {
       // For the first room, position it in the top-left corner with some margin
       const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
       addRoom(width, height, defaultRoomPosition);
@@ -74,46 +77,91 @@ class FloorPlanController {
   }
 
   Offset? _findNextRoomPosition(double roomWidth, double roomHeight) {
-    if (_rooms.isEmpty || _floorBase == null) return null;
+    if (_floorBase == null) return null;
 
-    Room lastRoom = _rooms.last;
-
-    // 1. Try position to the right
-    Offset rightPosition = Offset(
-        lastRoom.position.dx + lastRoom.width + roomSpacing,
-        lastRoom.position.dy);
-
-    if (_roomFitsWithinBase(roomWidth, roomHeight, rightPosition) &&
-        _roomDoesNotOverlapWithOtherRooms(
-            roomWidth, roomHeight, rightPosition)) {
-      return rightPosition;
+    // If this is the first element (no rooms and no stairs), start from top-left
+    if (_rooms.isEmpty && _stairs.isEmpty) {
+      Offset initialPosition = const Offset(roomSpacing, roomSpacing);
+      if (_roomFitsWithinBase(roomWidth, roomHeight, initialPosition) &&
+          _roomDoesNotOverlapWithOtherRooms(
+              roomWidth, roomHeight, initialPosition)) {
+        print("done1");
+        return initialPosition;
+      }
     }
 
-    // 2. Try position to the left
-    Offset leftPosition = Offset(
-        lastRoom.position.dx - roomWidth - roomSpacing, lastRoom.position.dy);
+    // Get the last placed element's position and dimensions
+    Offset? lastPosition;
+    double lastWidth = 0;
+    double lastHeight = 0;
 
-    if (_roomFitsWithinBase(roomWidth, roomHeight, leftPosition) &&
-        _roomDoesNotOverlapWithOtherRooms(
-            roomWidth, roomHeight, leftPosition)) {
-      return leftPosition;
+    if (_rooms.isNotEmpty) {
+      Room lastRoom = _rooms.last;
+      lastPosition = lastRoom.position;
+      lastWidth = lastRoom.width;
+      lastHeight = lastRoom.height;
+    } else if (_stairs.isNotEmpty) {
+      Stairs lastStairs = _stairs.last;
+      lastPosition = lastStairs.position;
+      lastWidth = lastStairs.width;
+      lastHeight = lastStairs.length;
     }
 
-    // 3. Try position below
-    Offset bottomPosition = Offset(lastRoom.position.dx,
-        lastRoom.position.dy + lastRoom.height + roomSpacing);
+    if (lastPosition != null) {
+      // Try positions in all four directions from the last element
+      List<Offset> candidatePositions = [
+        // Right
+        Offset(lastPosition.dx + lastWidth + roomSpacing, lastPosition.dy),
+        // Left
+        Offset(lastPosition.dx - roomWidth - roomSpacing, lastPosition.dy),
+        // Below
+        Offset(lastPosition.dx, lastPosition.dy + lastHeight + roomSpacing),
+        // Above
+        Offset(lastPosition.dx, lastPosition.dy - roomHeight - roomSpacing),
+      ];
 
-    if (_roomFitsWithinBase(roomWidth, roomHeight, bottomPosition) &&
-        _roomDoesNotOverlapWithOtherRooms(
-            roomWidth, roomHeight, bottomPosition)) {
-      return bottomPosition;
+      // Try each candidate position
+      for (Offset position in candidatePositions) {
+        if (_roomFitsWithinBase(roomWidth, roomHeight, position) &&
+            _roomDoesNotOverlapWithOtherRooms(
+                roomWidth, roomHeight, position)) {
+          print("done 2");
+          return position;
+        }
+      }
     }
 
-    // If no direct positions work, try to find the next available row
-    return _findAlternativePosition(roomWidth, roomHeight);
+    // If no direct positions work, try a grid-based search
+    return _findAlternativePositionForRoom(roomWidth, roomHeight);
   }
 
-  Offset? _findAlternativePosition(double roomWidth, double roomHeight) {
+  // Offset? _findPositionInGrid(double roomWidth, double roomHeight) {
+  //   if (_floorBase == null) return null;
+
+  //   double gridSpacing = roomSpacing;
+
+  //   // Start from top-left corner
+  //   for (double y = roomSpacing;
+  //       y + roomHeight <= _floorBase!.height;
+  //       y += gridSpacing) {
+  //     for (double x = roomSpacing;
+  //         x + roomWidth <= _floorBase!.width;
+  //         x += gridSpacing) {
+  //       Offset candidatePosition = Offset(x, y);
+
+  //       if (_roomFitsWithinBase(roomWidth, roomHeight, candidatePosition) &&
+  //           _roomDoesNotOverlapWithOtherRooms(
+  //               roomWidth, roomHeight, candidatePosition)) {
+  //         print("done 3");
+  //         return candidatePosition;
+  //       }
+  //     }
+  //   }
+  //   print("done 4");
+  //   return null;
+  // }
+
+  Offset? _findAlternativePositionForRoom(double roomWidth, double roomHeight) {
     if (_floorBase == null) return null;
 
     // Start from the top of the base with some margin
@@ -224,18 +272,22 @@ class FloorPlanController {
 
   bool _roomDoesNotOverlapWithOtherRooms(
       double roomWidth, double roomHeight, Offset position) {
-    for (final existingRoom in _rooms) {
-      // Add a small buffer around rooms
-      bool overlaps = !(position.dx + roomWidth + roomSpacing <=
-              existingRoom.position.dx ||
-          position.dx >=
-              existingRoom.position.dx + existingRoom.width + roomSpacing ||
-          position.dy + roomHeight + roomSpacing <= existingRoom.position.dy ||
-          position.dy >=
-              existingRoom.position.dy + existingRoom.height + roomSpacing);
-
-      if (overlaps) return false;
+    // Check overlap with existing rooms
+    for (final room in _rooms) {
+      if (_checkOverlap(position, roomWidth, roomHeight, room.position,
+          room.width, room.height)) {
+        return false;
+      }
     }
+
+    // Add check for overlap with stairs
+    for (final stairs in _stairs) {
+      if (_checkOverlap(position, roomWidth, roomHeight, stairs.position,
+          stairs.width, stairs.length)) {
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -270,14 +322,22 @@ class FloorPlanController {
       if (room.name == name) {
         selectedRoom = room;
         selectedRoomName = room.name;
+        originalColor = room.hasHiddenWalls ? Colors.transparent : Colors.black;
+        room.roomPaint.color = Colors.red;
+        deselectStairs();
         return room;
       }
     }
+
     deselectRoom();
     return null;
   }
 
   void deselectRoom() {
+    if (selectedRoom != null) {
+      selectedRoom!.roomPaint.color =
+          selectedRoom!.hasHiddenWalls ? Colors.transparent : Colors.black;
+    }
     selectedRoom = null;
     selectedRoomName = null;
   }
@@ -337,28 +397,23 @@ class FloorPlanController {
     }
   }
 
-  bool _checkOverlap(
-    Offset pos1,
-    double width1,
-    double height1,
-    Offset pos2,
-    double width2,
-    double height2,
-  ) {
+  bool _checkOverlap(Offset pos1, double width1, double height1, Offset pos2,
+      double width2, double height2) {
     return !(pos1.dx + width1 + roomSpacing <= pos2.dx ||
         pos1.dx >= pos2.dx + width2 + roomSpacing ||
         pos1.dy + height1 + roomSpacing <= pos2.dy ||
         pos1.dy >= pos2.dy + height2 + roomSpacing);
   }
 
-  void moveRoomToPosition(String position) {
+  void moveRoomToPosition(String position, BuildContext context) {
     if (selectedRoom == null || _floorBase == null) {
       Fluttertoast.showToast(
           msg: "Please select a room and ensure base exists");
       return;
     }
 
-    double newX, newY;
+    double newX = selectedRoom!.position.dx;
+    double newY = selectedRoom!.position.dy;
 
     switch (position.toLowerCase()) {
       case "center":
@@ -381,12 +436,66 @@ class FloorPlanController {
         newX = _floorBase!.width - selectedRoom!.width - roomSpacing;
         newY = _floorBase!.height - selectedRoom!.height - roomSpacing;
         break;
+      case "right":
+        // Find the rightmost point of all rooms except the selected one
+        double rightmostPoint = 0;
+        for (Room room in _rooms) {
+          if (room != selectedRoom) {
+            double roomRightEdge = room.position.dx + room.width;
+            if (roomRightEdge > rightmostPoint) {
+              rightmostPoint = roomRightEdge;
+            }
+          }
+        }
+        newX = rightmostPoint;
+        break;
+      case "left":
+        // Find the leftmost point of all rooms except the selected one
+        double leftmostPoint = double.infinity;
+        for (Room room in _rooms) {
+          if (room != selectedRoom) {
+            if (room.position.dx < leftmostPoint) {
+              leftmostPoint = room.position.dx;
+            }
+          }
+        }
+        newX = leftmostPoint - selectedRoom!.width;
+        break;
+      case "up":
+        // Find the topmost point of all rooms except the selected one
+        double topmostPoint = double.infinity;
+        for (Room room in _rooms) {
+          if (room != selectedRoom) {
+            if (room.position.dy < topmostPoint) {
+              topmostPoint = room.position.dy;
+            }
+          }
+        }
+        newY = topmostPoint - selectedRoom!.height;
+        break;
+      case "down":
+        // Find the bottommost point of all rooms except the selected one
+        double bottommostPoint = 0;
+        for (Room room in _rooms) {
+          if (room != selectedRoom) {
+            double roomBottomEdge = room.position.dy + room.height;
+            if (roomBottomEdge > bottommostPoint) {
+              bottommostPoint = roomBottomEdge;
+            }
+          }
+        }
+        newY = bottommostPoint;
+        break;
       default:
-        Fluttertoast.showToast(msg: "Invalid position specified");
+        MessageService.showMessage(context, "Invalid position specified",
+            type: MessageType.error);
         return;
     }
 
     moveRoom(newX, newY);
+    MessageService.showMessage(
+        context, "Moved ${selectedRoom!.name} to $position",
+        type: MessageType.success);
   }
 
   void moveStairsToPosition(String position) {
@@ -752,6 +861,64 @@ class FloorPlanController {
     }
   }
 
+  void resizeStairs(double newWidth, double newLength) {
+    if (selectedStairs == null) {
+      Fluttertoast.showToast(msg: "Please select stairs first");
+      return;
+    }
+
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "No base exists");
+      return;
+    }
+
+    // Check if new dimensions are valid
+    if (newWidth <= 0 || newLength <= 0) {
+      Fluttertoast.showToast(
+          msg: "Invalid dimensions. Must be greater than 0.");
+      return;
+    }
+
+    // Store current position
+    Offset currentPosition = selectedStairs!.position;
+
+    // Check if the room would still fit within the base with new dimensions
+    if (!_stairsFitsWithinBase(newWidth, newLength, currentPosition)) {
+      Fluttertoast.showToast(
+          msg: "New size would place stairs outside base boundaries");
+      return;
+    }
+
+    // Create a temporary list without the selected room to check overlap
+    List<Stairs> otherStairs =
+        _stairs.where((stairs) => stairs != selectedStairs).toList();
+
+    // Check for overlaps with other rooms
+    bool wouldOverlap = false;
+    for (final existingStairs in otherStairs) {
+      if (_checkOverlap(
+          currentPosition,
+          newWidth,
+          newLength,
+          existingStairs.position,
+          existingStairs.width,
+          existingStairs.length)) {
+        wouldOverlap = true;
+        break;
+      }
+    }
+
+    if (!wouldOverlap) {
+      selectedStairs!.width = newWidth;
+      selectedStairs!.length = newLength;
+      Fluttertoast.showToast(msg: "Stairs resized successfully");
+    } else {
+      Fluttertoast.showToast(
+          msg:
+              "Cannot resize Stairs - would overlap with other rooms or stairs");
+    }
+  }
+
   void addStairs(double width, double length, Offset position, String direction,
       int numberOfSteps) {
     if (_floorBase == null) {
@@ -759,25 +926,15 @@ class FloorPlanController {
       return;
     }
 
-    if (_stairsFitsWithinBase(width, length, position)) {
-      if (_stairsDoNotOverlap(width, length, position)) {
-        _stairsCounter++;
-        _stairs.add(Stairs(
-            width: width,
-            length: length,
-            position: position,
-            direction: direction,
-            numberOfSteps: numberOfSteps,
-            name: "stairs $_stairsCounter"));
-        Fluttertoast.showToast(msg: "Stairs added successfully");
-        print(_stairs[0]);
-      } else {
-        Fluttertoast.showToast(
-            msg: "Stairs overlap with existing rooms or stairs.");
-      }
-    } else {
-      Fluttertoast.showToast(msg: "Stairs must be completely inside the base.");
-    }
+    _stairsCounter++;
+    _stairs.add(Stairs(
+        width: width,
+        length: length,
+        position: position,
+        direction: direction,
+        numberOfSteps: numberOfSteps,
+        name: "stairs $_stairsCounter"));
+    Fluttertoast.showToast(msg: "Stairs added successfully");
   }
 
   bool _stairsFitsWithinBase(double width, double length, Offset position) {
@@ -821,13 +978,120 @@ class FloorPlanController {
     return true;
   }
 
+  void addNextStairs({
+    required double width,
+    required double length,
+    required String direction,
+    required int numberOfSteps,
+  }) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Please create a base first");
+      return;
+    }
+
+    // Find next available position for stairs
+    Offset? nextPosition = _findNextStairsPosition(width, length);
+
+    if (nextPosition != null) {
+      addStairs(width, length, nextPosition, direction, numberOfSteps);
+    } else {
+      Fluttertoast.showToast(msg: "No suitable position found for new stairs");
+    }
+  }
+
+  Offset? _findNextStairsPosition(double stairsWidth, double stairsLength) {
+    if (_floorBase == null) return null;
+
+    // If this is the first element (no rooms and no stairs), start from top-left
+    if (_rooms.isEmpty && _stairs.isEmpty) {
+      Offset initialPosition = const Offset(roomSpacing, roomSpacing);
+      if (_stairsFitsWithinBase(stairsWidth, stairsLength, initialPosition) &&
+          _stairsDoNotOverlap(stairsWidth, stairsLength, initialPosition)) {
+        return initialPosition;
+      }
+    }
+
+    // Get the last placed element's position and dimensions
+    Offset? lastPosition;
+    double lastWidth = 0;
+    double lastHeight = 0;
+
+    // Check last placed element (either room or stairs)
+    if (_rooms.isNotEmpty) {
+      Room lastRoom = _rooms.last;
+      lastPosition = lastRoom.position;
+      lastWidth = lastRoom.width;
+      lastHeight = lastRoom.height;
+    }
+    if (_stairs.isNotEmpty) {
+      Stairs lastStairs = _stairs.last;
+      lastPosition = lastStairs.position;
+      lastWidth = lastStairs.width;
+      lastHeight = lastStairs.length;
+    }
+
+    if (lastPosition != null) {
+      // Try positions in all four directions from the last element
+      List<Offset> candidatePositions = [
+        // Right
+        Offset(lastPosition.dx + lastWidth + roomSpacing, lastPosition.dy),
+        // Left
+        Offset(lastPosition.dx - stairsWidth - roomSpacing, lastPosition.dy),
+        // Below
+        Offset(lastPosition.dx, lastPosition.dy + lastHeight + roomSpacing),
+        // Above
+        Offset(lastPosition.dx, lastPosition.dy - stairsLength - roomSpacing),
+      ];
+
+      // Try each candidate position
+      for (Offset position in candidatePositions) {
+        if (_stairsFitsWithinBase(stairsWidth, stairsLength, position) &&
+            _stairsDoNotOverlap(stairsWidth, stairsLength, position)) {
+          return position;
+        }
+      }
+    }
+
+    // If no direct positions work, try a grid-based search
+    return _findAlternativePositionForStairs(stairsWidth, stairsLength);
+  }
+
+  Offset? _findAlternativePositionForStairs(
+      double stairsWidth, double stairsLength) {
+    if (_floorBase == null) return null;
+
+    // Start from the top of the base with some margin
+    double currentY = roomSpacing;
+
+    while (currentY + stairsLength <= _floorBase!.height) {
+      // Try placing rooms from left to right in each row
+      double currentX = roomSpacing;
+
+      while (currentX + stairsWidth <= _floorBase!.width) {
+        Offset testPosition = Offset(currentX, currentY);
+
+        if (_stairsDoNotOverlap(stairsWidth, stairsLength, testPosition)) {
+          return testPosition;
+        }
+
+        currentX += stairsWidth + roomSpacing;
+      }
+
+      currentY += stairsLength + roomSpacing;
+    }
+
+    return null;
+  }
+
   Stairs? selectStairs(String name) {
     for (Stairs stairs in _stairs) {
       if (stairs.name == name) {
         selectedStairs = stairs;
+        deselectRoom();
         return stairs;
       }
     }
+
     deselectStairs();
     return null;
   }
@@ -874,6 +1138,115 @@ class FloorPlanController {
       }
     } else {
       Fluttertoast.showToast(msg: "Cannot move stairs outside base boundaries");
+    }
+  }
+
+  void rotateStairs() {
+    if (selectedStairs == null) return;
+
+    String stairsName = selectedStairs!.name;
+
+    // Find the stairs by name
+    final stairsIndex =
+        _stairs.indexWhere((stairs) => stairs.name == stairsName);
+
+    if (stairsIndex == -1) {
+      Fluttertoast.showToast(msg: "Stairs not found");
+      return;
+    }
+
+    Stairs currentStairs = _stairs[stairsIndex];
+
+    // For 90-degree clockwise rotation, we simply swap width and length
+    double newWidth = currentStairs.length;
+    double newLength = currentStairs.width;
+
+    // Check if the stairs with new dimensions would fit and not overlap
+    if (!_canRotateStairs(currentStairs, newWidth, newLength)) {
+      Fluttertoast.showToast(msg: "Cannot rotate stairs - not enough space");
+      return;
+    }
+
+    const List<String> directions = ["up", "right", "down", "left"];
+    int newDirectionIndex = directions.indexOf(currentStairs.direction) + 1;
+    if (newDirectionIndex >= directions.length) {
+      newDirectionIndex = 0;
+    }
+
+    // Create new stairs with rotated dimensions but same up/down direction
+    Stairs rotatedStairs = Stairs(
+      width: newWidth,
+      length: newLength,
+      position: currentStairs.position,
+      direction: directions[newDirectionIndex],
+      numberOfSteps: currentStairs.numberOfSteps,
+      name: currentStairs.name,
+    );
+
+    // Replace old stairs with rotated one
+    _stairs[stairsIndex] = rotatedStairs;
+    selectStairs(rotatedStairs.name);
+
+    Fluttertoast.showToast(msg: "Stairs rotated successfully");
+  }
+
+  bool _canRotateStairs(Stairs stairs, double newWidth, double newLength) {
+    // Check if new dimensions would fit within base
+    if (!_stairsFitsWithinBase(newWidth, newLength, stairs.position)) {
+      return false;
+    }
+
+    // Create a temporary list excluding the current stairs
+    final otherStairs = _stairs.where((s) => s.name != stairs.name).toList();
+
+    // Check overlap with other stairs
+    for (final other in otherStairs) {
+      if (_checkOverlap(
+        stairs.position,
+        newWidth,
+        newLength,
+        other.position,
+        other.width,
+        other.length,
+      )) {
+        return false;
+      }
+    }
+
+    // Check overlap with rooms
+    for (final room in _rooms) {
+      if (_checkOverlap(
+        stairs.position,
+        newWidth,
+        newLength,
+        room.position,
+        room.width,
+        room.height,
+      )) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  void hideWalls() {
+    if (selectedRoom != null) {
+      selectedRoom!.hasHiddenWalls = true;
+      selectedRoom!.roomPaint.color = Colors.grey.withOpacity(0.3);
+      Fluttertoast.showToast(msg: "Walls hidden for ${selectedRoom!.name}");
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room first");
+    }
+  }
+
+  void showWalls() {
+    if (selectedRoom != null) {
+      selectedRoom!.hasHiddenWalls = false;
+      selectedRoom!.roomPaint.color = Colors.black;
+      Fluttertoast.showToast(msg: "Walls shown for ${selectedRoom!.name}");
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room first");
     }
   }
 }
