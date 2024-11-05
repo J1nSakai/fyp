@@ -14,16 +14,22 @@ class FloorPlanView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: FloorPlanPainter(
-          controller.getRooms(),
-          controller.getStairs(),
-          controller.getBase(),
-          controller.selectedRoomName,
-          controller.selectedStairs),
-      size: Size(MediaQuery.of(context).size.width,
-          MediaQuery.of(context).size.height),
-      child: Container(),
+    return InteractiveViewer(
+      boundaryMargin: const EdgeInsets.all(100),
+      minScale: 0.5,
+      maxScale: 4.0,
+      child: CustomPaint(
+        painter: FloorPlanPainter(
+            controller.getRooms(),
+            controller.getStairs(),
+            controller.getBase(),
+            controller.selectedRoomName,
+            controller.selectedStairs,
+            controller.zoomLevel),
+        size: Size(MediaQuery.of(context).size.width,
+            MediaQuery.of(context).size.height),
+        child: Container(),
+      ),
     );
   }
 }
@@ -35,14 +41,18 @@ class FloorPlanPainter extends CustomPainter {
   String? selectedRoomName;
   Stairs? selectedStairs;
   static const double scaleFactor = 10.0;
+  final double zoomLevel;
 
   FloorPlanPainter(this.rooms, this.stairs, this.floorBase,
-      this.selectedRoomName, this.selectedStairs);
+      this.selectedRoomName, this.selectedStairs, this.zoomLevel);
 
   @override
   void paint(Canvas canvas, Size size) {
     final screenCenterX = size.width / 2;
     final screenCenterY = size.height / 2;
+
+    // Apply zoom to scaleFactor
+    final adjustedScaleFactor = scaleFactor * zoomLevel;
 
     final basePaint = Paint()
       ..color = Colors.black
@@ -60,8 +70,8 @@ class FloorPlanPainter extends CustomPainter {
 
     // Draw base if present
     if (floorBase != null) {
-      final baseWidthInPixels = floorBase!.width * scaleFactor;
-      final baseHeightInPixels = floorBase!.height * scaleFactor;
+      final baseWidthInPixels = floorBase!.width * adjustedScaleFactor;
+      final baseHeightInPixels = floorBase!.height * adjustedScaleFactor;
 
       // Calculate base position relative to screen center
       final baseLeft = screenCenterX - (baseWidthInPixels / 2);
@@ -80,21 +90,21 @@ class FloorPlanPainter extends CustomPainter {
       // Draw rooms
       for (Room room in rooms) {
         // Convert room position to screen coordinates
-        final roomLeft = baseLeft + (room.position.dx * scaleFactor);
-        final roomTop = baseTop + (room.position.dy * scaleFactor);
+        final roomLeft = baseLeft + (room.position.dx * adjustedScaleFactor);
+        final roomTop = baseTop + (room.position.dy * adjustedScaleFactor);
 
         final roomRect = Rect.fromLTWH(
           roomLeft,
           roomTop,
-          room.width * scaleFactor,
-          room.height * scaleFactor,
+          room.width * adjustedScaleFactor,
+          room.height * adjustedScaleFactor,
         );
 
         canvas.drawRect(roomRect, room.roomPaint);
 
         // Draw room label
-        final roomCenterX = roomLeft + (room.width * scaleFactor / 2);
-        final roomCenterY = roomTop + (room.height * scaleFactor / 2);
+        final roomCenterX = roomLeft + (room.width * adjustedScaleFactor / 2);
+        final roomCenterY = roomTop + (room.height * adjustedScaleFactor / 2);
 
         final roomText =
             "${room.name[0].toUpperCase()}${room.name.substring(1)}\n${room.width}ft x ${room.height}ft";
@@ -105,7 +115,8 @@ class FloorPlanPainter extends CustomPainter {
           textAlign: TextAlign.center,
         );
 
-        roomTextPainter.layout(minWidth: 0, maxWidth: room.width * scaleFactor);
+        roomTextPainter.layout(
+            minWidth: 0, maxWidth: room.width * adjustedScaleFactor);
         roomTextPainter.paint(
           canvas,
           Offset(
@@ -144,19 +155,19 @@ class FloorPlanPainter extends CustomPainter {
     }
 
     for (Stairs stair in stairs) {
-      final baseWidthInPixels = floorBase!.width * scaleFactor;
-      final baseHeightInPixels = floorBase!.height * scaleFactor;
+      final baseWidthInPixels = floorBase!.width * adjustedScaleFactor;
+      final baseHeightInPixels = floorBase!.height * adjustedScaleFactor;
 
       final baseLeft = screenCenterX - (baseWidthInPixels / 2);
       final baseTop = screenCenterY - (baseHeightInPixels / 2);
-      final stairLeft = baseLeft + (stair.position.dx * scaleFactor);
-      final stairTop = baseTop + (stair.position.dy * scaleFactor);
+      final stairLeft = baseLeft + (stair.position.dx * adjustedScaleFactor);
+      final stairTop = baseTop + (stair.position.dy * adjustedScaleFactor);
 
       final stairRect = Rect.fromLTWH(
         stairLeft,
         stairTop,
-        stair.width * scaleFactor,
-        stair.length * scaleFactor,
+        stair.width * adjustedScaleFactor,
+        stair.length * adjustedScaleFactor,
       );
 
       // Draw stairs outline
@@ -178,10 +189,10 @@ class FloorPlanPainter extends CustomPainter {
           // Horizontal steps for up/down stairs
           final stepHeight = stair.length / stair.numberOfSteps;
           for (int i = 1; i < stair.numberOfSteps; i++) {
-            final y = stairTop + (i * stepHeight * scaleFactor);
+            final y = stairTop + (i * stepHeight * adjustedScaleFactor);
             canvas.drawLine(
               Offset(stairLeft, y),
-              Offset(stairLeft + (stair.width * scaleFactor), y),
+              Offset(stairLeft + (stair.width * adjustedScaleFactor), y),
               stepPaint,
             );
           }
@@ -192,10 +203,10 @@ class FloorPlanPainter extends CustomPainter {
           // Vertical steps for left/right stairs
           final stepWidth = stair.width / stair.numberOfSteps;
           for (int i = 1; i < stair.numberOfSteps; i++) {
-            final x = stairLeft + (i * stepWidth * scaleFactor);
+            final x = stairLeft + (i * stepWidth * adjustedScaleFactor);
             canvas.drawLine(
               Offset(x, stairTop),
-              Offset(x, stairTop + (stair.length * scaleFactor)),
+              Offset(x, stairTop + (stair.length * adjustedScaleFactor)),
               stepPaint,
             );
           }
@@ -207,9 +218,10 @@ class FloorPlanPainter extends CustomPainter {
         ..color = Colors.black
         ..strokeWidth = 2;
 
-      final centerX = stairLeft + (stair.width * scaleFactor / 2);
-      final centerY = stairTop + (stair.length * scaleFactor / 2);
-      final arrowSize = min(stair.width, stair.length) * scaleFactor * 0.3;
+      final centerX = stairLeft + (stair.width * adjustedScaleFactor / 2);
+      final centerY = stairTop + (stair.length * adjustedScaleFactor / 2);
+      final arrowSize =
+          min(stair.width, stair.length) * adjustedScaleFactor * 0.3;
 
       switch (stair.direction) {
         case "up":

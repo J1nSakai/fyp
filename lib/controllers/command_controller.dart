@@ -103,6 +103,11 @@ class CommandController {
       _handleRoomCommand(command, tokens);
     } else if (tokens.contains("stairs")) {
       _handleStairsCommand(command, tokens);
+    }
+    // Add zoom command handling
+    else if (tokens.contains("zoom")) {
+      _handleZoomCommand(tokens);
+      return;
     } else {
       Fluttertoast.showToast(msg: "Invalid Command: $command");
     }
@@ -998,5 +1003,52 @@ class CommandController {
     String stairsName = tokens.sublist(1).join(" ");
     print(stairsName);
     floorPlanController?.selectStairs(stairsName.trim());
+  }
+
+  void _handleZoomCommand(List<String> tokens) {
+    if (tokens.contains("in")) {
+      floorPlanController?.zoomIn();
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Zoomed in",
+        type: MessageType.info,
+      );
+      return;
+    }
+
+    if (tokens.contains("out")) {
+      floorPlanController?.zoomOut();
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Zoomed out",
+        type: MessageType.info,
+      );
+      return;
+    }
+
+    // Handle specific zoom level
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        try {
+          double zoomLevel = double.parse(tokens[toIndex + 1]);
+          floorPlanController?.setZoom(zoomLevel);
+          MessageService.showMessage(
+            floorManagerController.context,
+            "Zoom level set to $zoomLevel",
+            type: MessageType.info,
+          );
+          return;
+        } catch (e) {
+          // Handle parsing error
+        }
+      }
+    }
+
+    MessageService.showMessage(
+      floorManagerController.context,
+      "Invalid zoom command. Try: 'zoom in', 'zoom out', or 'zoom to 2.0'",
+      type: MessageType.error,
+    );
   }
 }

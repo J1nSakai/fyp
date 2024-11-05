@@ -5,7 +5,7 @@ import 'package:saysketch_v2/models/stairs.dart';
 import 'package:saysketch_v2/services/message_service.dart';
 import '../models/room_model.dart';
 
-class FloorPlanController {
+class FloorPlanController extends ChangeNotifier {
   FloorBase? _floorBase;
   final List<Room> _rooms = [];
   int _roomCounter = 0;
@@ -19,6 +19,13 @@ class FloorPlanController {
   late Color originalColor;
 
   static const double roomSpacing = 0.0; //  unit spacing between rooms
+
+  double _zoomLevel = 1.0;
+  static const double _zoomIncrement = 0.2;
+  static const double _minZoom = 0.5;
+  static const double _maxZoom = 4.0;
+
+  double get zoomLevel => _zoomLevel;
 
   void setDefaultBase() {
     const double defaultBaseWidth = 80;
@@ -1248,5 +1255,26 @@ class FloorPlanController {
     } else {
       Fluttertoast.showToast(msg: "Please select a room first");
     }
+  }
+
+  void zoomIn() {
+    if (_zoomLevel < _maxZoom) {
+      _zoomLevel += _zoomIncrement;
+      if (_zoomLevel > _maxZoom) _zoomLevel = _maxZoom;
+      notifyListeners();
+    }
+  }
+
+  void zoomOut() {
+    if (_zoomLevel > _minZoom) {
+      _zoomLevel -= _zoomIncrement;
+      if (_zoomLevel < _minZoom) _zoomLevel = _minZoom;
+      notifyListeners();
+    }
+  }
+
+  void setZoom(double level) {
+    _zoomLevel = level.clamp(_minZoom, _maxZoom);
+    notifyListeners();
   }
 }
