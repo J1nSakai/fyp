@@ -67,66 +67,222 @@ class _HomeViewState extends State<HomeView> {
     return ListenableProvider<FloorManagerController>.value(
       value: _floorManager,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Center(child: Text("Floor Plan App")),
-          backgroundColor: Theme.of(context).primaryColor,
-          foregroundColor: Colors.white,
-        ),
-        body: Stack(
+        body: Column(
           children: [
-            Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Consumer<FloorManagerController>(
-                        builder: (context, floorManager, _) => FloorPlanView(
-                          controller: floorManager.getActiveController()!,
-                        ),
+            // Modern App Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    "SaySketch",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.help_outline, color: Colors.white),
+                    onPressed: () => _showCommandsDialog(context),
+                  ),
+                ],
+              ),
+            ),
+            // Main Content
+            Expanded(
+              child: Row(
+                children: [
+                  // Left Sidebar
+                  Container(
+                    width: 250,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: Colors.grey.shade200),
                       ),
-                      const FloorSelectorView(),
-                    ],
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton(
-                      onPressed:
-                          _isListening ? _stopListening : _startListening,
-                      child: Text(
-                          _isListening ? "Stop Listening" : "Start Listening"),
                     ),
-                    ElevatedButton(
-                      onPressed: () =>
-                          _floorManager.getActiveController()?.addNextRoom(),
-                      child: const Text("Add Next Room"),
+                    child: Column(
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text(
+                            "Floor Plans",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const FloorSelectorView(),
+                        const Spacer(),
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: ElevatedButton.icon(
+                            onPressed: () => _floorManager
+                                .getActiveController()
+                                ?.addNextRoom(),
+                            icon: const Icon(Icons.add),
+                            label: const Text("Add Next Room"),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(45),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: "Enter command here...",
-                      border: OutlineInputBorder(),
+                  ),
+                  // Main Floor Plan View
+                  Expanded(
+                    child: Consumer<FloorManagerController>(
+                      builder: (context, floorManager, _) => FloorPlanView(
+                        controller: floorManager.getActiveController()!,
+                      ),
                     ),
-                    onSubmitted: _handleTextCommand,
-                    autofocus: true,
+                  )
+                ],
+              ),
+            ),
+            // Command Input Bar at Bottom
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Text(
-                    "Commands: 'create base', 'add room', 'another room', 'remove base', 'remove rooms', 'remove last room', 'add new floor', 'switch to floor 2'",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 16),
+                          Icon(Icons.keyboard, color: Colors.grey[600]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _controller,
+                              decoration: const InputDecoration(
+                                hintText: "Type your command here...",
+                                border: InputBorder.none,
+                                contentPadding:
+                                    EdgeInsets.symmetric(horizontal: 16),
+                              ),
+                              onSubmitted: _handleTextCommand,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              _isListening ? Icons.mic_off : Icons.mic,
+                              color:
+                                  _isListening ? Colors.red : Colors.grey[600],
+                            ),
+                            onPressed:
+                                _isListening ? _stopListening : _startListening,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCommandsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Available Commands"),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CommandItem(
+                command: "create base", description: "Create a new floor base"),
+            CommandItem(command: "add room", description: "Add a new room"),
+            CommandItem(
+                command: "another room", description: "Add another room"),
+            CommandItem(
+                command: "remove base", description: "Remove the floor base"),
+            CommandItem(
+                command: "remove rooms", description: "Remove all rooms"),
+            CommandItem(
+                command: "remove last room",
+                description: "Remove the last room"),
+            CommandItem(
+                command: "add new floor", description: "Add a new floor"),
+            CommandItem(
+                command: "switch to floor X",
+                description: "Switch to specified floor"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CommandItem extends StatelessWidget {
+  final String command;
+  final String description;
+
+  const CommandItem({
+    super.key,
+    required this.command,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "• $command",
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "- $description",
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+        ],
       ),
     );
   }

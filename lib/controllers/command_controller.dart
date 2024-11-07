@@ -259,7 +259,7 @@ class CommandController {
           "topleft",
           "topright",
           "bottomleft",
-          "bottomright"
+          "bottomright",
         ]) {
           if (tokens.contains(position)) {
             floorPlanController?.moveStairsToPosition(position);

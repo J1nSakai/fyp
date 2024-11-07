@@ -6,6 +6,7 @@ import 'package:saysketch_v2/models/floor_base_model.dart';
 import 'package:saysketch_v2/models/stairs.dart';
 
 import '../models/room_model.dart';
+import 'widgets/scale_indicator.dart';
 
 class FloorPlanView extends StatelessWidget {
   final FloorPlanController controller;
@@ -14,22 +15,34 @@ class FloorPlanView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InteractiveViewer(
-      boundaryMargin: const EdgeInsets.all(100),
-      minScale: 0.5,
-      maxScale: 4.0,
-      child: CustomPaint(
-        painter: FloorPlanPainter(
-            controller.getRooms(),
-            controller.getStairs(),
-            controller.getBase(),
-            controller.selectedRoomName,
-            controller.selectedStairs,
-            controller.zoomLevel),
-        size: Size(MediaQuery.of(context).size.width,
-            MediaQuery.of(context).size.height),
-        child: Container(),
-      ),
+    return Stack(
+      children: [
+        InteractiveViewer(
+          boundaryMargin: const EdgeInsets.all(100),
+          minScale: 0.25,
+          maxScale: 6.0,
+          child: CustomPaint(
+            painter: FloorPlanPainter(
+              controller.getRooms(),
+              controller.getStairs(),
+              controller.getBase(),
+              controller.selectedRoomName,
+              controller.selectedStairs,
+              controller.zoomLevel,
+            ),
+            size: Size(
+              MediaQuery.of(context).size.width,
+              MediaQuery.of(context).size.height,
+            ),
+          ),
+        ),
+        // Floating Scale Indicator
+        Positioned(
+          right: 20,
+          bottom: 20,
+          child: ScaleIndicator(zoomLevel: controller.zoomLevel),
+        ),
+      ],
     );
   }
 }
@@ -40,7 +53,7 @@ class FloorPlanPainter extends CustomPainter {
   final FloorBase? floorBase;
   String? selectedRoomName;
   Stairs? selectedStairs;
-  static const double scaleFactor = 10.0;
+  static const double scaleFactor = 24.0; // 1:50 (1ft = 24px)
   final double zoomLevel;
 
   FloorPlanPainter(this.rooms, this.stairs, this.floorBase,

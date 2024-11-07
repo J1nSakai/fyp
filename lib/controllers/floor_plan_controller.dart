@@ -25,15 +25,52 @@ class FloorPlanController extends ChangeNotifier {
   static const double _minZoom = 0.5;
   static const double _maxZoom = 4.0;
 
+  // All getters:
   double get zoomLevel => _zoomLevel;
 
+  List<Room> getRooms() {
+    return _rooms;
+  }
+
+  FloorBase? getBase() {
+    return _floorBase;
+  }
+
+  List<Stairs> getStairs() {
+    return _stairs;
+  }
+
+  // All base building methods:
   void setDefaultBase() {
-    const double defaultBaseWidth = 80;
-    const double defaultBaseHeight = 50;
+    const double defaultBaseWidth = 30.0;
+    const double defaultBaseHeight = 20.0;
     const Offset defaultBasePosition = Offset(0, 0);
 
     _floorBase =
         FloorBase(defaultBaseWidth, defaultBaseHeight, defaultBasePosition);
+  }
+
+  void setBase(double width, double height, Offset position) {
+    _floorBase = FloorBase(width, height, position);
+  }
+
+  // All room building methods:
+  void addRoom(double width, double height, Offset position) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Base is not set yet.");
+      return;
+    }
+
+    if (_roomFitsWithinBase(width, height, position)) {
+      if (_roomDoesNotOverlapWithOtherRooms(width, height, position)) {
+        _roomCounter++;
+        _rooms.add(Room(width, height, position, "room $_roomCounter"));
+      } else {
+        Fluttertoast.showToast(msg: "Room overlaps with existing rooms.");
+      }
+    } else {
+      Fluttertoast.showToast(msg: "Room must be completely inside the base.");
+    }
   }
 
   void addDefaultRoom() {
@@ -42,13 +79,20 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    const double defaultRoomWidth = 10;
-    const double defaultRoomHeight = 10;
+    const double defaultRoomWidth = 20;
+    const double defaultRoomHeight = 15;
 
     // For the first room, position it in the top-left corner with some margin
     const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
 
     addRoom(defaultRoomWidth, defaultRoomHeight, defaultRoomPosition);
+  }
+
+  void addNextRoom() {
+    const double defaultRoomWidth = 10;
+    const double defaultRoomHeight = 10;
+    addNextRoomWithDimensions(
+        width: defaultRoomWidth, height: defaultRoomHeight);
   }
 
   void addNextRoomWithDimensions(
@@ -75,14 +119,55 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  // Update existing addNextRoom to use default dimensions
-  void addNextRoom() {
-    const double defaultRoomWidth = 10;
-    const double defaultRoomHeight = 10;
-    addNextRoomWithDimensions(
-        width: defaultRoomWidth, height: defaultRoomHeight);
+  void addRoomRelativeTo(
+      double width, double height, int referenceRoomIndex, String position) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Please create a base first");
+      return;
+    }
+
+    if (referenceRoomIndex < 0 || referenceRoomIndex >= _rooms.length) {
+      Fluttertoast.showToast(msg: "Invalid room reference number");
+      return;
+    }
+
+    Room referenceRoom = _rooms[referenceRoomIndex];
+    Offset? newPosition;
+
+    switch (position) {
+      case "below":
+        newPosition = Offset(referenceRoom.position.dx,
+            referenceRoom.position.dy + referenceRoom.height + roomSpacing);
+        break;
+      case "above":
+        newPosition = Offset(referenceRoom.position.dx,
+            referenceRoom.position.dy - height - roomSpacing);
+        break;
+      case "right":
+        newPosition = Offset(
+            referenceRoom.position.dx + referenceRoom.width + roomSpacing,
+            referenceRoom.position.dy);
+        break;
+      case "left":
+        newPosition = Offset(referenceRoom.position.dx - width - roomSpacing,
+            referenceRoom.position.dy);
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid position specified");
+        return;
+    }
+
+    if (_roomFitsWithinBase(width, height, newPosition) &&
+        _roomDoesNotOverlapWithOtherRooms(width, height, newPosition)) {
+      addRoom(width, height, newPosition);
+    } else {
+      Fluttertoast.showToast(
+          msg:
+              "Cannot place room at specified position. Check for overlaps or base boundaries.");
+    }
   }
 
+  // All room positioning helper methods:
   Offset? _findNextRoomPosition(double roomWidth, double roomHeight) {
     if (_floorBase == null) return null;
 
@@ -142,32 +227,6 @@ class FloorPlanController extends ChangeNotifier {
     return _findAlternativePositionForRoom(roomWidth, roomHeight);
   }
 
-  // Offset? _findPositionInGrid(double roomWidth, double roomHeight) {
-  //   if (_floorBase == null) return null;
-
-  //   double gridSpacing = roomSpacing;
-
-  //   // Start from top-left corner
-  //   for (double y = roomSpacing;
-  //       y + roomHeight <= _floorBase!.height;
-  //       y += gridSpacing) {
-  //     for (double x = roomSpacing;
-  //         x + roomWidth <= _floorBase!.width;
-  //         x += gridSpacing) {
-  //       Offset candidatePosition = Offset(x, y);
-
-  //       if (_roomFitsWithinBase(roomWidth, roomHeight, candidatePosition) &&
-  //           _roomDoesNotOverlapWithOtherRooms(
-  //               roomWidth, roomHeight, candidatePosition)) {
-  //         print("done 3");
-  //         return candidatePosition;
-  //       }
-  //     }
-  //   }
-  //   print("done 4");
-  //   return null;
-  // }
-
   Offset? _findAlternativePositionForRoom(double roomWidth, double roomHeight) {
     if (_floorBase == null) return null;
 
@@ -193,78 +252,6 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     return null;
-  }
-
-  void setBase(double width, double height, Offset position) {
-    _floorBase = FloorBase(width, height, position);
-  }
-
-  void addRoom(double width, double height, Offset position) {
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "Base is not set yet.");
-      return;
-    }
-
-    if (_roomFitsWithinBase(width, height, position)) {
-      if (_roomDoesNotOverlapWithOtherRooms(width, height, position)) {
-        _roomCounter++;
-        _rooms.add(Room(width, height, position, "room $_roomCounter"));
-      } else {
-        Fluttertoast.showToast(msg: "Room overlaps with existing rooms.");
-      }
-    } else {
-      Fluttertoast.showToast(msg: "Room must be completely inside the base.");
-    }
-  }
-
-  // In FloorPlanController class, add these new methods:
-
-  void addRoomRelativeTo(
-      double width, double height, int referenceRoomIndex, String position) {
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "Please create a base first");
-      return;
-    }
-
-    if (referenceRoomIndex < 0 || referenceRoomIndex >= _rooms.length) {
-      Fluttertoast.showToast(msg: "Invalid room reference number");
-      return;
-    }
-
-    Room referenceRoom = _rooms[referenceRoomIndex];
-    Offset? newPosition;
-
-    switch (position) {
-      case "below":
-        newPosition = Offset(referenceRoom.position.dx,
-            referenceRoom.position.dy + referenceRoom.height + roomSpacing);
-        break;
-      case "above":
-        newPosition = Offset(referenceRoom.position.dx,
-            referenceRoom.position.dy - height - roomSpacing);
-        break;
-      case "right":
-        newPosition = Offset(
-            referenceRoom.position.dx + referenceRoom.width + roomSpacing,
-            referenceRoom.position.dy);
-        break;
-      case "left":
-        newPosition = Offset(referenceRoom.position.dx - width - roomSpacing,
-            referenceRoom.position.dy);
-        break;
-      default:
-        Fluttertoast.showToast(msg: "Invalid position specified");
-        return;
-    }
-
-    if (_roomFitsWithinBase(width, height, newPosition) &&
-        _roomDoesNotOverlapWithOtherRooms(width, height, newPosition)) {
-      addRoom(width, height, newPosition);
-    } else {
-      Fluttertoast.showToast(
-          msg:
-              "Cannot place room at specified position. Check for overlaps or base boundaries.");
-    }
   }
 
   bool _roomFitsWithinBase(
@@ -298,23 +285,83 @@ class FloorPlanController extends ChangeNotifier {
     return true;
   }
 
-  List<Room> getRooms() {
-    return _rooms;
+  // Offset? _findPositionInGrid(double roomWidth, double roomHeight) {
+  //   if (_floorBase == null) return null;
+
+  //   double gridSpacing = roomSpacing;
+
+  //   // Start from top-left corner
+  //   for (double y = roomSpacing;
+  //       y + roomHeight <= _floorBase!.height;
+  //       y += gridSpacing) {
+  //     for (double x = roomSpacing;
+  //         x + roomWidth <= _floorBase!.width;
+  //         x += gridSpacing) {
+  //       Offset candidatePosition = Offset(x, y);
+
+  //       if (_roomFitsWithinBase(roomWidth, roomHeight, candidatePosition) &&
+  //           _roomDoesNotOverlapWithOtherRooms(
+  //               roomWidth, roomHeight, candidatePosition)) {
+  //         print("done 3");
+  //         return candidatePosition;
+  //       }
+  //     }
+  //   }
+  //   print("done 4");
+  //   return null;
+  // }
+
+  // All stairs building methods:
+  void addStairs(double width, double length, Offset position, String direction,
+      int numberOfSteps) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Base is not set yet.");
+      return;
+    }
+
+    _stairsCounter++;
+    _stairs.add(Stairs(
+        width: width,
+        length: length,
+        position: position,
+        direction: direction,
+        numberOfSteps: numberOfSteps,
+        name: "stairs $_stairsCounter"));
+    Fluttertoast.showToast(msg: "Stairs added successfully");
   }
 
-  FloorBase? getBase() {
-    return _floorBase;
+  void addNextStairs({
+    required double width,
+    required double length,
+    required String direction,
+    required int numberOfSteps,
+  }) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Please create a base first");
+      return;
+    }
+
+    // Find next available position for stairs
+    Offset? nextPosition = _findNextStairsPosition(width, length);
+
+    if (nextPosition != null) {
+      addStairs(width, length, nextPosition, direction, numberOfSteps);
+    } else {
+      Fluttertoast.showToast(msg: "No suitable position found for new stairs");
+    }
   }
 
-  void removeAllRooms() {
-    _roomCounter = 0;
-    _rooms.clear();
-  }
-
+  // All base removal methods:
   void removeBase() {
     removeAllRooms();
     removeAllStairs();
     _floorBase = null;
+  }
+
+  // All room removal methods:
+  void removeAllRooms() {
+    _roomCounter = 0;
+    _rooms.clear();
   }
 
   void removeLastAddedRoom() {
@@ -324,9 +371,30 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
+  void removeSelectedRoom() {
+    _rooms.remove(selectedRoom);
+    deselectRoom();
+  }
+
+  // All stairs removal methods:
+  void removeSelectedStairs() {
+    if (selectedStairs != null) {
+      _stairs.remove(selectedStairs);
+      deselectStairs();
+    }
+  }
+
+  void removeAllStairs() {
+    _stairs.clear();
+    _stairsCounter = 0;
+    deselectStairs();
+  }
+
+  // All room selection methods:
   Room? selectRoom(String name) {
     for (Room room in _rooms) {
       if (room.name == name) {
+        deselectRoom();
         selectedRoom = room;
         selectedRoomName = room.name;
         originalColor = room.hasHiddenWalls ? Colors.transparent : Colors.black;
@@ -349,15 +417,12 @@ class FloorPlanController extends ChangeNotifier {
     selectedRoomName = null;
   }
 
+  // Room renaming method:
   void renameRoom(String name) {
     selectedRoom!.name = name;
   }
 
-  void removeSelectedRoom() {
-    _rooms.remove(selectedRoom);
-    deselectRoom();
-  }
-
+  // All room movement methods:
   void moveRoom(double newX, double newY) {
     if (selectedRoom == null) {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -402,14 +467,6 @@ class FloorPlanController extends ChangeNotifier {
     } else {
       Fluttertoast.showToast(msg: "Cannot move room outside base boundaries");
     }
-  }
-
-  bool _checkOverlap(Offset pos1, double width1, double height1, Offset pos2,
-      double width2, double height2) {
-    return !(pos1.dx + width1 + roomSpacing <= pos2.dx ||
-        pos1.dx >= pos2.dx + width2 + roomSpacing ||
-        pos1.dy + height1 + roomSpacing <= pos2.dy ||
-        pos1.dy >= pos2.dy + height2 + roomSpacing);
   }
 
   void moveRoomToPosition(String position, BuildContext context) {
@@ -505,44 +562,6 @@ class FloorPlanController extends ChangeNotifier {
         type: MessageType.success);
   }
 
-  void moveStairsToPosition(String position) {
-    if (selectedStairs == null || _floorBase == null) {
-      Fluttertoast.showToast(
-          msg: "Please select a stairs and ensure base exists");
-      return;
-    }
-
-    double newX, newY;
-
-    switch (position.toLowerCase()) {
-      case "center":
-        newX = (_floorBase!.width - selectedStairs!.width) / 2;
-        newY = (_floorBase!.height - selectedStairs!.length) / 2;
-        break;
-      case "topleft":
-        newX = roomSpacing;
-        newY = roomSpacing;
-        break;
-      case "topright":
-        newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
-        newY = roomSpacing;
-        break;
-      case "bottomleft":
-        newX = roomSpacing;
-        newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
-        break;
-      case "bottomright":
-        newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
-        newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
-        break;
-      default:
-        Fluttertoast.showToast(msg: "Invalid position specified");
-        return;
-    }
-
-    moveStairs(newX, newY);
-  }
-
   void moveRoomRelative(double distance, String direction) {
     if (selectedRoom == null) {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -575,40 +594,6 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     moveRoom(newX, newY);
-  }
-
-  void moveStairsRelative(double distance, String direction) {
-    if (selectedStairs == null) {
-      Fluttertoast.showToast(msg: "Please select a room first");
-      return;
-    }
-
-    double newX = selectedStairs!.position.dx;
-    double newY = selectedStairs!.position.dy;
-
-    switch (direction.toLowerCase()) {
-      case "right":
-      case "east":
-        newX += distance;
-        break;
-      case "left":
-      case "west":
-        newX -= distance;
-        break;
-      case "up":
-      case "north":
-        newY -= distance;
-        break;
-      case "down":
-      case "south":
-        newY += distance;
-        break;
-      default:
-        Fluttertoast.showToast(msg: "Invalid direction specified");
-        return;
-    }
-
-    moveStairs(newX, newY);
   }
 
   void moveRoomRelativeToOther(int referenceRoomIndex, String direction) {
@@ -653,54 +638,6 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     moveRoom(newX, newY);
-  }
-
-  void moveStairsRelativeToOther(int referenceStairsIndex, String direction) {
-    if (selectedStairs == null) {
-      Fluttertoast.showToast(msg: "Please select a stairs first");
-      return;
-    }
-
-    if (referenceStairsIndex < 0 || referenceStairsIndex >= _stairs.length) {
-      Fluttertoast.showToast(msg: "Invalid room reference");
-      return;
-    }
-
-    Stairs referenceStairs = _stairs[referenceStairsIndex];
-    double newX = selectedStairs!.position.dx;
-    double newY = selectedStairs!.position.dy;
-
-    switch (direction.toLowerCase()) {
-      case "right":
-      case "east":
-        newX =
-            referenceStairs.position.dx + referenceStairs.width + roomSpacing;
-        newY = referenceStairs.position.dy;
-        break;
-      case "left":
-      case "west":
-        newX =
-            referenceStairs.position.dx - selectedStairs!.width - roomSpacing;
-        newY = referenceStairs.position.dy;
-        break;
-      case "above":
-      case "north":
-        newX = referenceStairs.position.dx;
-        newY =
-            referenceStairs.position.dy - selectedStairs!.length - roomSpacing;
-        break;
-      case "below":
-      case "south":
-        newX = referenceStairs.position.dx;
-        newY =
-            referenceStairs.position.dy + referenceStairs.length + roomSpacing;
-        break;
-      default:
-        Fluttertoast.showToast(msg: "Invalid direction specified");
-        return;
-    }
-
-    moveStairs(newX, newY);
   }
 
   void moveRoomRelativeToStairs(int referenceStairsIndex, String direction) {
@@ -749,73 +686,7 @@ class FloorPlanController extends ChangeNotifier {
     moveRoom(newX, newY);
   }
 
-  void moveStairsRelativeToRoom(int referenceRoomIndex, String direction) {
-    if (selectedStairs == null) {
-      Fluttertoast.showToast(msg: "Please select stairs first");
-      return;
-    }
-
-    if (referenceRoomIndex < 0 || referenceRoomIndex >= _rooms.length) {
-      Fluttertoast.showToast(msg: "Invalid room reference");
-      return;
-    }
-
-    Room referenceRoom = _rooms[referenceRoomIndex];
-    double newX = selectedStairs!.position.dx;
-    double newY = selectedStairs!.position.dy;
-
-    switch (direction.toLowerCase()) {
-      case "right":
-      case "east":
-        newX = referenceRoom.position.dx + referenceRoom.width + roomSpacing;
-        newY = referenceRoom.position.dy;
-        break;
-      case "left":
-      case "west":
-        newX = referenceRoom.position.dx - selectedStairs!.width - roomSpacing;
-        newY = referenceRoom.position.dy;
-        break;
-      case "above":
-      case "north":
-        newX = referenceRoom.position.dx;
-        newY = referenceRoom.position.dy - selectedStairs!.length - roomSpacing;
-        break;
-      case "below":
-      case "south":
-        newX = referenceRoom.position.dx;
-        newY = referenceRoom.position.dy + referenceRoom.height + roomSpacing;
-        break;
-      default:
-        Fluttertoast.showToast(msg: "Invalid direction specified");
-        return;
-    }
-
-    moveStairs(newX, newY);
-  }
-
-  double convertToMetricUnits(double value, String unit) {
-    switch (unit.toLowerCase()) {
-      case "feet":
-      case "foot":
-      case "ft":
-        return value; // Convert feet to meters
-      case "inches":
-      case "inch":
-      case "in":
-        return value * 0.0833; // Convert inches to meters
-      case "meters":
-      case "meter":
-      case "m":
-        return value * 3.28024;
-      case "centimeters":
-      case "centimeter":
-      case "cm":
-        return value * 0.0328; // Convert centimeters to meters
-      default:
-        return value; // Default to assuming feet
-    }
-  }
-
+  // Room resizing method:
   void resizeRoom(double newWidth, double newHeight) {
     if (selectedRoom == null) {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -868,6 +739,235 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
+  // Room walls hiding method:
+  void hideWalls() {
+    if (selectedRoom != null) {
+      selectedRoom!.hasHiddenWalls = true;
+      selectedRoom!.roomPaint.color = Colors.grey.withOpacity(0.3);
+      Fluttertoast.showToast(msg: "Walls hidden for ${selectedRoom!.name}");
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room first");
+    }
+  }
+
+  // Room walls showing method:
+  void showWalls() {
+    if (selectedRoom != null) {
+      selectedRoom!.hasHiddenWalls = false;
+      selectedRoom!.roomPaint.color = Colors.black;
+      Fluttertoast.showToast(msg: "Walls shown for ${selectedRoom!.name}");
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room first");
+    }
+  }
+
+  // All stairs selection methods:
+  Stairs? selectStairs(String name) {
+    for (Stairs stairs in _stairs) {
+      if (stairs.name == name) {
+        selectedStairs = stairs;
+        deselectRoom();
+        return stairs;
+      }
+    }
+    deselectStairs();
+    return null;
+  }
+
+  void deselectStairs() {
+    selectedStairs = null;
+  }
+
+  // All stairs movement methods:
+  void moveStairs(double newX, double newY) {
+    if (selectedStairs == null) {
+      Fluttertoast.showToast(msg: "Please select stairs first");
+      return;
+    }
+
+    Offset newPosition = Offset(newX, newY);
+
+    if (_stairsFitsWithinBase(
+        selectedStairs!.width, selectedStairs!.length, newPosition)) {
+      if (_stairsDoNotOverlap(
+          selectedStairs!.width, selectedStairs!.length, newPosition)) {
+        selectedStairs!.position = newPosition;
+        Fluttertoast.showToast(msg: "Stairs moved successfully");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Cannot move stairs - would overlap with rooms or other stairs");
+      }
+    } else {
+      Fluttertoast.showToast(msg: "Cannot move stairs outside base boundaries");
+    }
+  }
+
+  void moveStairsToPosition(String position) {
+    if (selectedStairs == null || _floorBase == null) {
+      Fluttertoast.showToast(
+          msg: "Please select a stairs and ensure base exists");
+      return;
+    }
+
+    double newX, newY;
+
+    switch (position.toLowerCase()) {
+      case "center":
+        newX = (_floorBase!.width - selectedStairs!.width) / 2;
+        newY = (_floorBase!.height - selectedStairs!.length) / 2;
+        break;
+      case "topleft":
+        newX = roomSpacing;
+        newY = roomSpacing;
+        break;
+      case "topright":
+        newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
+        newY = roomSpacing;
+        break;
+      case "bottomleft":
+        newX = roomSpacing;
+        newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
+        break;
+      case "bottomright":
+        newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
+        newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid position specified");
+        return;
+    }
+
+    moveStairs(newX, newY);
+  }
+
+  void moveStairsRelative(double distance, String direction) {
+    if (selectedStairs == null) {
+      Fluttertoast.showToast(msg: "Please select a room first");
+      return;
+    }
+
+    double newX = selectedStairs!.position.dx;
+    double newY = selectedStairs!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX += distance;
+        break;
+      case "left":
+      case "west":
+        newX -= distance;
+        break;
+      case "up":
+      case "north":
+        newY -= distance;
+        break;
+      case "down":
+      case "south":
+        newY += distance;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveStairs(newX, newY);
+  }
+
+  void moveStairsRelativeToOther(int referenceStairsIndex, String direction) {
+    if (selectedStairs == null) {
+      Fluttertoast.showToast(msg: "Please select a stairs first");
+      return;
+    }
+
+    if (referenceStairsIndex < 0 || referenceStairsIndex >= _stairs.length) {
+      Fluttertoast.showToast(msg: "Invalid room reference");
+      return;
+    }
+
+    Stairs referenceStairs = _stairs[referenceStairsIndex];
+    double newX = selectedStairs!.position.dx;
+    double newY = selectedStairs!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX =
+            referenceStairs.position.dx + referenceStairs.width + roomSpacing;
+        newY = referenceStairs.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX =
+            referenceStairs.position.dx - selectedStairs!.width - roomSpacing;
+        newY = referenceStairs.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceStairs.position.dx;
+        newY =
+            referenceStairs.position.dy - selectedStairs!.length - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceStairs.position.dx;
+        newY =
+            referenceStairs.position.dy + referenceStairs.length + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveStairs(newX, newY);
+  }
+
+  void moveStairsRelativeToRoom(int referenceRoomIndex, String direction) {
+    if (selectedStairs == null) {
+      Fluttertoast.showToast(msg: "Please select stairs first");
+      return;
+    }
+
+    if (referenceRoomIndex < 0 || referenceRoomIndex >= _rooms.length) {
+      Fluttertoast.showToast(msg: "Invalid room reference");
+      return;
+    }
+
+    Room referenceRoom = _rooms[referenceRoomIndex];
+    double newX = selectedStairs!.position.dx;
+    double newY = selectedStairs!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX = referenceRoom.position.dx + referenceRoom.width + roomSpacing;
+        newY = referenceRoom.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX = referenceRoom.position.dx - selectedStairs!.width - roomSpacing;
+        newY = referenceRoom.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceRoom.position.dx;
+        newY = referenceRoom.position.dy - selectedStairs!.length - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceRoom.position.dx;
+        newY = referenceRoom.position.dy + referenceRoom.height + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveStairs(newX, newY);
+  }
+
+  // Stairs resizing method:
   void resizeStairs(double newWidth, double newLength) {
     if (selectedStairs == null) {
       Fluttertoast.showToast(msg: "Please select stairs first");
@@ -926,24 +1026,65 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  void addStairs(double width, double length, Offset position, String direction,
-      int numberOfSteps) {
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "Base is not set yet.");
+  bool _checkOverlap(Offset pos1, double width1, double height1, Offset pos2,
+      double width2, double height2) {
+    return !(pos1.dx + width1 + roomSpacing <= pos2.dx ||
+        pos1.dx >= pos2.dx + width2 + roomSpacing ||
+        pos1.dy + height1 + roomSpacing <= pos2.dy ||
+        pos1.dy >= pos2.dy + height2 + roomSpacing);
+  }
+
+  // Stairs rotation method:
+  void rotateStairs() {
+    if (selectedStairs == null) return;
+
+    String stairsName = selectedStairs!.name;
+
+    // Find the stairs by name
+    final stairsIndex =
+        _stairs.indexWhere((stairs) => stairs.name == stairsName);
+
+    if (stairsIndex == -1) {
+      Fluttertoast.showToast(msg: "Stairs not found");
       return;
     }
 
-    _stairsCounter++;
-    _stairs.add(Stairs(
-        width: width,
-        length: length,
-        position: position,
-        direction: direction,
-        numberOfSteps: numberOfSteps,
-        name: "stairs $_stairsCounter"));
-    Fluttertoast.showToast(msg: "Stairs added successfully");
+    Stairs currentStairs = _stairs[stairsIndex];
+
+    // For 90-degree clockwise rotation, we simply swap width and length
+    double newWidth = currentStairs.length;
+    double newLength = currentStairs.width;
+
+    // Check if the stairs with new dimensions would fit and not overlap
+    if (!_canRotateStairs(currentStairs, newWidth, newLength)) {
+      Fluttertoast.showToast(msg: "Cannot rotate stairs - not enough space");
+      return;
+    }
+
+    const List<String> directions = ["up", "right", "down", "left"];
+    int newDirectionIndex = directions.indexOf(currentStairs.direction) + 1;
+    if (newDirectionIndex >= directions.length) {
+      newDirectionIndex = 0;
+    }
+
+    // Create new stairs with rotated dimensions but same up/down direction
+    Stairs rotatedStairs = Stairs(
+      width: newWidth,
+      length: newLength,
+      position: currentStairs.position,
+      direction: directions[newDirectionIndex],
+      numberOfSteps: currentStairs.numberOfSteps,
+      name: currentStairs.name,
+    );
+
+    // Replace old stairs with rotated one
+    _stairs[stairsIndex] = rotatedStairs;
+    selectStairs(rotatedStairs.name);
+
+    Fluttertoast.showToast(msg: "Stairs rotated successfully");
   }
 
+  // All stairs position helper methods:
   bool _stairsFitsWithinBase(double width, double length, Offset position) {
     if (_floorBase == null) return false;
 
@@ -983,27 +1124,6 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     return true;
-  }
-
-  void addNextStairs({
-    required double width,
-    required double length,
-    required String direction,
-    required int numberOfSteps,
-  }) {
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "Please create a base first");
-      return;
-    }
-
-    // Find next available position for stairs
-    Offset? nextPosition = _findNextStairsPosition(width, length);
-
-    if (nextPosition != null) {
-      addStairs(width, length, nextPosition, direction, numberOfSteps);
-    } else {
-      Fluttertoast.showToast(msg: "No suitable position found for new stairs");
-    }
   }
 
   Offset? _findNextStairsPosition(double stairsWidth, double stairsLength) {
@@ -1090,113 +1210,6 @@ class FloorPlanController extends ChangeNotifier {
     return null;
   }
 
-  Stairs? selectStairs(String name) {
-    for (Stairs stairs in _stairs) {
-      if (stairs.name == name) {
-        selectedStairs = stairs;
-        deselectRoom();
-        return stairs;
-      }
-    }
-
-    deselectStairs();
-    return null;
-  }
-
-  void deselectStairs() {
-    selectedStairs = null;
-  }
-
-  void removeSelectedStairs() {
-    if (selectedStairs != null) {
-      _stairs.remove(selectedStairs);
-      deselectStairs();
-    }
-  }
-
-  void removeAllStairs() {
-    _stairs.clear();
-    _stairsCounter = 0;
-    deselectStairs();
-  }
-
-  List<Stairs> getStairs() {
-    return _stairs;
-  }
-
-  void moveStairs(double newX, double newY) {
-    if (selectedStairs == null) {
-      Fluttertoast.showToast(msg: "Please select stairs first");
-      return;
-    }
-
-    Offset newPosition = Offset(newX, newY);
-
-    if (_stairsFitsWithinBase(
-        selectedStairs!.width, selectedStairs!.length, newPosition)) {
-      if (_stairsDoNotOverlap(
-          selectedStairs!.width, selectedStairs!.length, newPosition)) {
-        selectedStairs!.position = newPosition;
-        Fluttertoast.showToast(msg: "Stairs moved successfully");
-      } else {
-        Fluttertoast.showToast(
-            msg:
-                "Cannot move stairs - would overlap with rooms or other stairs");
-      }
-    } else {
-      Fluttertoast.showToast(msg: "Cannot move stairs outside base boundaries");
-    }
-  }
-
-  void rotateStairs() {
-    if (selectedStairs == null) return;
-
-    String stairsName = selectedStairs!.name;
-
-    // Find the stairs by name
-    final stairsIndex =
-        _stairs.indexWhere((stairs) => stairs.name == stairsName);
-
-    if (stairsIndex == -1) {
-      Fluttertoast.showToast(msg: "Stairs not found");
-      return;
-    }
-
-    Stairs currentStairs = _stairs[stairsIndex];
-
-    // For 90-degree clockwise rotation, we simply swap width and length
-    double newWidth = currentStairs.length;
-    double newLength = currentStairs.width;
-
-    // Check if the stairs with new dimensions would fit and not overlap
-    if (!_canRotateStairs(currentStairs, newWidth, newLength)) {
-      Fluttertoast.showToast(msg: "Cannot rotate stairs - not enough space");
-      return;
-    }
-
-    const List<String> directions = ["up", "right", "down", "left"];
-    int newDirectionIndex = directions.indexOf(currentStairs.direction) + 1;
-    if (newDirectionIndex >= directions.length) {
-      newDirectionIndex = 0;
-    }
-
-    // Create new stairs with rotated dimensions but same up/down direction
-    Stairs rotatedStairs = Stairs(
-      width: newWidth,
-      length: newLength,
-      position: currentStairs.position,
-      direction: directions[newDirectionIndex],
-      numberOfSteps: currentStairs.numberOfSteps,
-      name: currentStairs.name,
-    );
-
-    // Replace old stairs with rotated one
-    _stairs[stairsIndex] = rotatedStairs;
-    selectStairs(rotatedStairs.name);
-
-    Fluttertoast.showToast(msg: "Stairs rotated successfully");
-  }
-
   bool _canRotateStairs(Stairs stairs, double newWidth, double newLength) {
     // Check if new dimensions would fit within base
     if (!_stairsFitsWithinBase(newWidth, newLength, stairs.position)) {
@@ -1237,26 +1250,7 @@ class FloorPlanController extends ChangeNotifier {
     return true;
   }
 
-  void hideWalls() {
-    if (selectedRoom != null) {
-      selectedRoom!.hasHiddenWalls = true;
-      selectedRoom!.roomPaint.color = Colors.grey.withOpacity(0.3);
-      Fluttertoast.showToast(msg: "Walls hidden for ${selectedRoom!.name}");
-    } else {
-      Fluttertoast.showToast(msg: "Please select a room first");
-    }
-  }
-
-  void showWalls() {
-    if (selectedRoom != null) {
-      selectedRoom!.hasHiddenWalls = false;
-      selectedRoom!.roomPaint.color = Colors.black;
-      Fluttertoast.showToast(msg: "Walls shown for ${selectedRoom!.name}");
-    } else {
-      Fluttertoast.showToast(msg: "Please select a room first");
-    }
-  }
-
+  // All zoom methods:
   void zoomIn() {
     if (_zoomLevel < _maxZoom) {
       _zoomLevel += _zoomIncrement;
@@ -1276,5 +1270,29 @@ class FloorPlanController extends ChangeNotifier {
   void setZoom(double level) {
     _zoomLevel = level.clamp(_minZoom, _maxZoom);
     notifyListeners();
+  }
+
+  // Metric conversion methods:
+  double convertToMetricUnits(double value, String unit) {
+    switch (unit.toLowerCase()) {
+      case "feet":
+      case "foot":
+      case "ft":
+        return value; // Convert feet to meters
+      case "inches":
+      case "inch":
+      case "in":
+        return value * 0.0833; // Convert inches to meters
+      case "meters":
+      case "meter":
+      case "m":
+        return value * 3.28024;
+      case "centimeters":
+      case "centimeter":
+      case "cm":
+        return value * 0.0328; // Convert centimeters to meters
+      default:
+        return value; // Default to assuming feet
+    }
   }
 }
