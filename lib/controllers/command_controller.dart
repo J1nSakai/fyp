@@ -5,6 +5,8 @@ import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
 import 'package:saysketch_v2/models/room_model.dart';
 import 'package:saysketch_v2/services/message_service.dart';
 
+import '../models/door.dart';
+
 class CommandController {
   final FloorManagerController floorManagerController;
   Room? selectedRoom;
@@ -20,14 +22,18 @@ class CommandController {
     List<String> tokens = command.split(" ");
 
     if ((tokens.contains("new") || tokens.contains("add")) &&
-        tokens.contains("floor")) {
+        (tokens.contains("floor") ||
+            tokens.contains("flower") ||
+            tokens.contains("flour"))) {
       floorManagerController.addNewFloor();
       return;
     }
 
     // Switch floor command handling
     if (tokens.contains("switch") || tokens.contains("go")) {
-      if (tokens.contains("floor")) {
+      if (tokens.contains("floor") ||
+          tokens.contains("flower") ||
+          tokens.contains("flour")) {
         for (int i = 0; i < tokens.length; i++) {
           try {
             int floorNum = int.parse(tokens[i]);
@@ -79,7 +85,7 @@ class CommandController {
       _handleShowCommand(tokens);
     }
     // Handle base creation commands
-    else if (tokens.contains("base")) {
+    else if (tokens.contains("base") || tokens.contains("bass")) {
       _handleBaseCommand(command, tokens);
     } else if (tokens.contains("select")) {
       if (tokens.contains("stairs")) {
@@ -99,7 +105,10 @@ class CommandController {
       _handleRotateCommand();
     }
     // Handle room commands
-    else if (tokens.contains("room") || tokens.contains("rooms")) {
+    else if (tokens.contains("room") ||
+        tokens.contains("rooms") ||
+        tokens.contains("dhoom") ||
+        tokens.contains("dhooms")) {
       _handleRoomCommand(command, tokens);
     } else if (tokens.contains("stairs")) {
       _handleStairsCommand(command, tokens);
@@ -107,6 +116,9 @@ class CommandController {
     // Add zoom command handling
     else if (tokens.contains("zoom")) {
       _handleZoomCommand(tokens);
+      return;
+    } else if (tokens.contains("door") || tokens.contains("doors")) {
+      _handleDoorCommand(command, tokens);
       return;
     } else {
       Fluttertoast.showToast(msg: "Invalid Command: $command");
@@ -171,7 +183,7 @@ class CommandController {
           type: MessageType.success);
       floorPlanController?.removeSelectedStairs();
     } else {
-      if (tokens.contains("base")) {
+      if (tokens.contains("base") || tokens.contains("bass")) {
         floorPlanController?.removeBase();
         MessageService.showMessage(
             floorManagerController.context, "Base removed",
@@ -646,7 +658,7 @@ class CommandController {
 
   Map<String, double> extractMeasurements(String command) {
     RegExp regExp = RegExp(
-        r'(\d+)\s*(feet|meters|foot)?\s*(?:by|x|\/)\s*(\d+)\s*(feet|meters|foot)?');
+        r'(\d+)\s*(feet|meters|foot|ft)?\s*(?:by|x|\/)\s*(\d+)\s*(feet|meters|foot|ft)?');
     var match = regExp.firstMatch(command);
 
     if (match != null) {
@@ -1050,5 +1062,262 @@ class CommandController {
       "Invalid zoom command. Try: 'zoom in', 'zoom out', or 'zoom to 2.0'",
       type: MessageType.error,
     );
+  }
+
+  void _handleDoorCommand(String command, List<String> tokens) {
+    // Check if a room is selected first
+    if (selectedRoom == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please select a room first before performing door operations",
+          type: MessageType.error);
+      return;
+    }
+
+    // Handle door removal
+    if (tokens.contains("remove") || tokens.contains("delete")) {
+      _handleRemoveDoorCommand(tokens);
+      return;
+    }
+
+    // Handle door addition
+    if (tokens.contains("add") || tokens.contains("create")) {
+      _handleAddDoorCommand(command, tokens);
+      return;
+    }
+
+    // Handle door movement
+    if (tokens.contains("move")) {
+      _handleMoveDoorCommand(command, tokens);
+      return;
+    }
+
+    // Handle door swing changes
+    if (tokens.contains("swing")) {
+      _handleDoorSwingCommand(tokens);
+      return;
+    }
+
+    MessageService.showMessage(floorManagerController.context,
+        "Invalid door command. Try: 'add door on [wall]', 'move door', 'change door swing', or 'remove door'",
+        type: MessageType.error);
+  }
+
+  void _handleAddDoorCommand(String command, List<String> tokens) {
+    // Extract wall
+    String? wall;
+    for (String direction in [
+      "north",
+      "up",
+      "south",
+      "down",
+      "east",
+      "right",
+      "west",
+      "left"
+    ]) {
+      if (tokens.contains(direction)) {
+        wall = direction;
+        break;
+      }
+    }
+
+    if (wall == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify a wall (north, south, east, or west)",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract offset (if specified) or calculate center position
+    double offset;
+    if (tokens.contains("at")) {
+      int atIndex = tokens.indexOf("at");
+      if (atIndex + 1 < tokens.length) {
+        try {
+          offset = double.parse(tokens[atIndex + 1]);
+        } catch (e) {
+          // If parsing fails, use center position
+          offset = _calculateDefaultDoorOffset(selectedRoom!, wall);
+        }
+      } else {
+        offset = _calculateDefaultDoorOffset(selectedRoom!, wall);
+      }
+    } else {
+      // If no offset specified, place door at center of wall
+      offset = _calculateDefaultDoorOffset(selectedRoom!, wall);
+    }
+
+    // Check for connecting door
+    bool connectToAdjacent =
+        tokens.contains("connecting") || tokens.contains("connected");
+
+    // Extract width if specified
+    double? width;
+    if (tokens.contains("width")) {
+      int widthIndex = tokens.indexOf("width");
+      if (widthIndex + 1 < tokens.length) {
+        try {
+          width = double.parse(tokens[widthIndex + 1]);
+        } catch (e) {
+          // Keep default width if parsing fails
+        }
+      }
+    }
+
+    // Add the door to the selected room
+    floorPlanController?.addDoor(
+      selectedRoom!.name,
+      wall,
+      offset,
+      width: width ?? Door.defaultWidth,
+      connectToAdjacent: connectToAdjacent,
+    );
+  }
+
+  // Add this helper method
+  double _calculateDefaultDoorOffset(Room room, String wall) {
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? room.width
+            : room.height;
+    // Place door at center of wall by default
+    return (wallLength - Door.defaultWidth) / 2;
+  }
+
+  void _handleMoveDoorCommand(String command, List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract door number
+    int? doorNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "door" && i + 1 < tokens.length) {
+        try {
+          doorNumber = int.parse(tokens[i + 1]);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    if (doorNumber == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please specify which door to move",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract new offset
+    double? newOffset;
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        try {
+          newOffset = double.parse(tokens[toIndex + 1]);
+        } catch (e) {
+          // Handle parsing error
+        }
+      }
+    }
+
+    if (newOffset == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify where to move the door",
+          type: MessageType.error);
+      return;
+    }
+
+    String doorId = "${selectedRoom!.name}:$doorNumber";
+    floorPlanController?.moveDoor(selectedRoom!.name, doorId, newOffset);
+  }
+
+  void _handleDoorSwingCommand(List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract door number
+    int? doorNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "door" && i + 1 < tokens.length) {
+        try {
+          doorNumber = int.parse(tokens[i + 1]);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    if (doorNumber == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please specify which door to modify",
+          type: MessageType.error);
+      return;
+    }
+
+    // Determine swing direction
+    bool? swingInward;
+    if (tokens.contains("in") || tokens.contains("inward")) {
+      swingInward = true;
+    } else if (tokens.contains("out") || tokens.contains("outward")) {
+      swingInward = false;
+    }
+
+    if (swingInward == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify swing direction (in/out)",
+          type: MessageType.error);
+      return;
+    }
+
+    floorPlanController?.changeDoorSwing(
+        selectedRoom!.name, "${selectedRoom!.name}:$doorNumber", swingInward);
+  }
+
+  void _handleRemoveDoorCommand(List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    // Handle "remove all doors"
+    if (tokens.contains("all")) {
+      floorPlanController?.removeAllDoors(selectedRoom!.name);
+      return;
+    }
+
+    // Extract door number
+    int? doorNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "door" && i + 1 < tokens.length) {
+        try {
+          doorNumber = int.parse(tokens[i + 1]);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    if (doorNumber == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please specify which door to remove",
+          type: MessageType.error);
+      return;
+    }
+
+    floorPlanController?.removeDoor(
+        selectedRoom!.name, "${selectedRoom!.name}:$doorNumber");
   }
 }

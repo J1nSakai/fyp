@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
+import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
 import 'package:saysketch_v2/models/stairs.dart';
 
@@ -146,7 +147,13 @@ class FloorPlanPainter extends CustomPainter {
         }
       }
 
-      // After drawing rooms, draw their doors and windows
+      // After drawing rooms but before drawing their dimensions, draw the doors
+      if (floorBase != null) {
+        for (Room room in rooms) {
+          _drawDoorsForRoom(
+              canvas, room, baseLeft, baseTop, adjustedScaleFactor);
+        }
+      }
 
       // Draw base dimensions
       const baseTextStyle = TextStyle(color: Colors.black, fontSize: 16);
@@ -326,6 +333,128 @@ class FloorPlanPainter extends CustomPainter {
           ..style = PaintingStyle.stroke;
 
         canvas.drawRect(stairRect, highlightPaint);
+      }
+    }
+  }
+
+  void _drawDoorsForRoom(Canvas canvas, Room room, double baseLeft,
+      double baseTop, double scaleFactor) {
+    for (Door door in room.doors) {
+      final doorPaint = Paint()
+        ..color = door.isHighlighted ? Colors.blue : Colors.black
+        ..strokeWidth = door.isHighlighted
+            ? room.roomPaint.strokeWidth
+            : room.roomPaint.strokeWidth + 1
+        ..style = PaintingStyle.stroke;
+
+      // Convert room position to screen coordinates
+      final roomLeft = baseLeft + (room.position.dx * scaleFactor);
+      final roomTop = baseTop + (room.position.dy * scaleFactor);
+      final roomRight = roomLeft + (room.width * scaleFactor);
+      final roomBottom = roomTop + (room.height * scaleFactor);
+
+      // Calculate door position and dimensions
+      double doorStart;
+      Offset gapStart, gapEnd;
+      Offset doorLineStart, doorLineEnd;
+      double doorLength = Door.defaultWidth * scaleFactor;
+
+      switch (door.wall) {
+        case "north":
+        case "up":
+          doorStart = roomLeft + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(doorStart, roomTop);
+          gapEnd = Offset(doorStart + doorLength, roomTop);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(doorLineStart.dx,
+              door.swingInward ? roomTop + doorLength : roomTop - doorLength);
+          break;
+
+        case "south":
+        case "down":
+          doorStart = roomLeft + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(doorStart, roomBottom);
+          gapEnd = Offset(doorStart + doorLength, roomBottom);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              doorLineStart.dx,
+              door.swingInward
+                  ? roomBottom - doorLength
+                  : roomBottom + doorLength);
+          break;
+
+        case "east":
+        case "right":
+          doorStart = roomTop + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(roomRight, doorStart);
+          gapEnd = Offset(roomRight, doorStart + doorLength);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              door.swingInward
+                  ? roomRight - doorLength
+                  : roomRight + doorLength,
+              doorLineStart.dy);
+          break;
+
+        case "west":
+        case "left":
+          doorStart = roomTop + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(roomLeft, doorStart);
+          gapEnd = Offset(roomLeft, doorStart + doorLength);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              door.swingInward ? roomLeft + doorLength : roomLeft - doorLength,
+              doorLineStart.dy);
+          break;
+
+        default:
+          continue;
+      }
+
+      // Draw door gap (erase part of the wall)
+      final gapPaint = Paint()
+        ..color = Colors.white
+        ..strokeWidth = doorPaint.strokeWidth + 1
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(gapStart, gapEnd, gapPaint);
+
+      // Draw door line
+      canvas.drawLine(doorLineStart, doorLineEnd, doorPaint);
+
+      // Draw arc from door line end to gap end
+      Path arcPath = Path()..moveTo(doorLineEnd.dx, doorLineEnd.dy);
+
+      // Calculate control point for the arc
+      Offset controlPoint;
+      if (door.wall == "north" ||
+          door.wall == "south" ||
+          door.wall == "up" ||
+          door.wall == "down") {
+        controlPoint =
+            Offset(door.openLeft ? gapEnd.dx : gapStart.dx, doorLineEnd.dy);
+      } else {
+        controlPoint =
+            Offset(doorLineEnd.dx, door.openLeft ? gapEnd.dy : gapStart.dy);
+      }
+
+      // Draw arc to the opposite end of the gap from where the door line starts
+      Offset arcEndPoint = door.openLeft ? gapEnd : gapStart;
+
+      arcPath.quadraticBezierTo(
+        controlPoint.dx,
+        controlPoint.dy,
+        arcEndPoint.dx,
+        arcEndPoint.dy,
+      );
+
+      canvas.drawPath(arcPath, doorPaint);
+
+      // Draw connecting door indicator if this is a connecting door
+      if (door.connectedDoor != null) {
+        final connectingDotPaint = Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(doorLineStart, 2, connectingDotPaint);
       }
     }
   }

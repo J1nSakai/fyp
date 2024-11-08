@@ -1,15 +1,25 @@
-import 'package:saysketch_v2/models/opening.dart';
+class Door {
+  static const double defaultWidth = 3.0; // 3 feet
+  static const double minDistanceFromCorner = 1.5; // 1.5 feet
+  static const double minDistanceBetweenDoors = 3.0; // 3 feet
 
-class Door extends Opening {
-  final bool isEntrance; // true if it's a main entrance door
-  final bool opensInward; // swing direction
+  final String id; // Format: "room_name:wall:number" (e.g., "room1:north:1")
+  double width;
+  double offsetFromWallStart;
+  String wall; // "north", "south", "east", "west"
+  bool swingInward;
+  bool openLeft;
+  Door? connectedDoor; // For doors connecting rooms
+  bool isHighlighted = false;
 
   Door({
-    required super.position,
-    required super.width,
-    required super.length,
-    required super.angle,
-    this.isEntrance = false,
-    this.opensInward = true,
+    required this.id,
+    this.width = defaultWidth,
+    required this.offsetFromWallStart,
+    required this.wall,
+    this.swingInward = true,
+    this.openLeft = true,
+    this.connectedDoor,
+    this.isHighlighted = false,
   });
 }

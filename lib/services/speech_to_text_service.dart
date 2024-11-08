@@ -13,7 +13,7 @@ class SpeechToTextService {
         listenOptions: SpeechListenOptions(partialResults: false),
         onResult: (result) {
           print(result.recognizedWords);
-          onCommandRecognized(result.recognizedWords.toLowerCase());
+          onCommandRecognized(result.recognizedWords.toLowerCase().trim());
         },
       );
     } else {}

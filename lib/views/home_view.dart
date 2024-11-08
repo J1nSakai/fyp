@@ -4,6 +4,7 @@ import 'package:saysketch_v2/controllers/floor_manager_controller.dart';
 import 'package:saysketch_v2/controllers/command_controller.dart';
 import 'package:saysketch_v2/services/speech_to_text_service.dart';
 import 'package:saysketch_v2/views/floor_selector_view.dart';
+import 'package:saysketch_v2/views/widgets/entity_info_panel.dart';
 import 'floor_plan_view.dart';
 
 class HomeView extends StatefulWidget {
@@ -19,12 +20,16 @@ class _HomeViewState extends State<HomeView> {
   final SpeechToTextService _speechService = SpeechToTextService();
   bool _isListening = false;
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _floorManager = FloorManagerController(context);
     _commandController = CommandController(_floorManager);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
     setState(() {});
   }
 
@@ -51,7 +56,8 @@ class _HomeViewState extends State<HomeView> {
 
   void _handleTextCommand(String text) {
     if (text.isNotEmpty) {
-      _onCommand(text);
+      _onCommand(text.trim());
+      _focusNode.requestFocus();
       _controller.clear();
     }
   }
@@ -144,10 +150,33 @@ class _HomeViewState extends State<HomeView> {
                   ),
                   // Main Floor Plan View
                   Expanded(
-                    child: Consumer<FloorManagerController>(
-                      builder: (context, floorManager, _) => FloorPlanView(
-                        controller: floorManager.getActiveController()!,
-                      ),
+                    child: Row(
+                      children: [
+                        // Main Floor Plan View (now with reduced width to accommodate info panel)
+                        Expanded(
+                          flex:
+                              4, // Takes 80% of the space when info panel is shown
+                          child: Consumer<FloorManagerController>(
+                            builder: (context, floorManager, _) =>
+                                FloorPlanView(
+                              controller: floorManager.getActiveController()!,
+                            ),
+                          ),
+                        ),
+                        // Info Panel
+                        if (_floorManager.getActiveController()?.selectedRoom !=
+                                null ||
+                            _floorManager
+                                    .getActiveController()
+                                    ?.selectedStairs !=
+                                null)
+                          Expanded(
+                            flex: 1, // Takes 20% of the space
+                            child: EntityInfoPanel(
+                              floorManagerController: _floorManager,
+                            ),
+                          ),
+                      ],
                     ),
                   )
                 ],
@@ -190,6 +219,7 @@ class _HomeViewState extends State<HomeView> {
                                     EdgeInsets.symmetric(horizontal: 16),
                               ),
                               onSubmitted: _handleTextCommand,
+                              focusNode: _focusNode,
                             ),
                           ),
                           IconButton(
