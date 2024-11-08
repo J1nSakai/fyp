@@ -1317,34 +1317,38 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    // Print room dimensions for debugging
-    print("Room dimensions: ${room!.width}x${room.height}");
-    print("Attempting to add door:");
-    print("Wall: $wall");
-    print("Offset: $offset");
-    print("Width: $width");
+    // Calculate door width based on room dimensions
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? room!.width
+            : room!.height;
 
-    // Validate door placement
-    if (!room.canAddDoor(wall, offset, width)) {
-      double wallLength =
-          (wall == "north" || wall == "south" || wall == "up" || wall == "down")
-              ? room.width
-              : room.height;
-      Fluttertoast.showToast(
-          msg:
-              "Invalid door position. Wall length: $wallLength ft. Door must be at least ${Door.minDistanceFromCorner}ft from corners and ${Door.minDistanceBetweenDoors}ft from other doors.");
-      return;
-    }
+    // Set door width to 1/3 of wall length, but not more than 4 feet
+    double calculatedWidth = (wallLength / 3).clamp(2.0, 4.0);
 
-    // Create the door
+    // Adjust offset if it would place the door too close to edges
+    double maxOffset =
+        wallLength - calculatedWidth - Door.minDistanceFromCorner;
+    double minOffset = Door.minDistanceFromCorner;
+    double adjustedOffset = offset.clamp(minOffset, maxOffset);
+
+    // Create the door with adjusted dimensions
     Door newDoor = Door(
       id: room.getNextDoorId(),
-      width: width,
-      offsetFromWallStart: offset,
+      width: calculatedWidth, // Use calculated width instead of parameter
+      offsetFromWallStart: adjustedOffset,
       wall: wall.toLowerCase(),
     );
 
-    // If connecting door is requested, try to find adjacent room
+    // Validate door placement with new dimensions
+    if (!room.canAddDoor(wall, adjustedOffset, calculatedWidth)) {
+      Fluttertoast.showToast(
+          msg:
+              "Invalid door position. Door must be at least ${Door.minDistanceFromCorner}ft from corners and ${Door.minDistanceBetweenDoors}ft from other doors.");
+      return;
+    }
+
+    // Handle connecting door
     if (connectToAdjacent) {
       Door? connectedDoor = _createConnectingDoor(room, newDoor);
       if (connectedDoor != null) {
@@ -1497,8 +1501,21 @@ class FloorPlanController extends ChangeNotifier {
 
     Door? door = room.doors.firstWhere((d) => d.id == doorId);
 
-    if (room.canAddDoor(door.wall, newOffset, door.width)) {
-      door.offsetFromWallStart = newOffset;
+    // Calculate wall length based on door's wall
+    double wallLength = (door.wall == "north" ||
+            door.wall == "south" ||
+            door.wall == "up" ||
+            door.wall == "down")
+        ? room.width
+        : room.height;
+
+    // Adjust offset to respect boundaries
+    double maxOffset = wallLength - door.width - Door.minDistanceFromCorner;
+    double minOffset = Door.minDistanceFromCorner;
+    double adjustedOffset = newOffset.clamp(minOffset, maxOffset);
+
+    if (room.canAddDoor(door.wall, adjustedOffset, door.width)) {
+      door.offsetFromWallStart = adjustedOffset;
 
       // Update connected door if exists
       if (door.connectedDoor != null) {

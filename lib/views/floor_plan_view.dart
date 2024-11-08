@@ -363,11 +363,29 @@ class FloorPlanPainter extends CustomPainter {
       final roomRight = roomLeft + (room.width * scaleFactor);
       final roomBottom = roomTop + (room.height * scaleFactor);
 
+      // Calculate door length based on room dimensions
+      double doorLength;
+      switch (door.wall) {
+        case "north":
+        case "south":
+        case "up":
+        case "down":
+          doorLength = (room.width * scaleFactor) / 3; // 1/3 of room width
+          break;
+        case "east":
+        case "west":
+        case "left":
+        case "right":
+          doorLength = (room.height * scaleFactor) / 3; // 1/3 of room height
+          break;
+        default:
+          doorLength = Door.defaultWidth * scaleFactor;
+      }
+
       // Calculate door position and dimensions
       double doorStart;
       Offset gapStart, gapEnd;
       Offset doorLineStart, doorLineEnd;
-      double doorLength = Door.defaultWidth * scaleFactor;
 
       switch (door.wall) {
         case "north":
