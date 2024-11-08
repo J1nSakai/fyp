@@ -4,6 +4,10 @@ import 'package:saysketch_v2/models/room_model.dart';
 import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/stairs.dart';
 
+import 'info_row.dart';
+import 'info_section.dart';
+import 'simple_door_info_tile.dart';
+
 class EntityInfoPanel extends StatelessWidget {
   final FloorManagerController floorManagerController;
 
@@ -14,10 +18,10 @@ class EntityInfoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Room? selectedRoom =
-        floorManagerController.getActiveController()?.selectedRoom;
-    Stairs? selectedStairs =
-        floorManagerController.getActiveController()?.selectedStairs;
+    var controller = floorManagerController.getActiveController();
+    Room? selectedRoom = controller?.selectedRoom;
+    Stairs? selectedStairs = controller?.selectedStairs;
+    Door? selectedDoor = controller?.selectedDoor;
 
     return Container(
       decoration: BoxDecoration(
@@ -48,7 +52,7 @@ class EntityInfoPanel extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  selectedRoom != null ? 'Room Details' : 'Stairs Details',
+                  _getHeaderTitle(selectedRoom, selectedStairs, selectedDoor),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -57,15 +61,12 @@ class EntityInfoPanel extends StatelessWidget {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () {
-                      if (selectedRoom != null) {
-                        floorManagerController
-                            .getActiveController()
-                            ?.deselectRoom();
-                        print(selectedRoom);
+                      if (selectedDoor != null) {
+                        controller?.deselectDoor();
+                      } else if (selectedRoom != null) {
+                        controller?.deselectRoom();
                       } else if (selectedStairs != null) {
-                        floorManagerController
-                            .getActiveController()
-                            ?.deselectStairs();
+                        controller?.deselectStairs();
                       }
                     },
                     child: const Icon(Icons.close, size: 20),
@@ -75,20 +76,38 @@ class EntityInfoPanel extends StatelessWidget {
             ),
           ),
 
-          // Scrollable Content
+          // Content
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: selectedRoom != null
-                    ? _buildRoomDetails(context, selectedRoom)
-                    : _buildStairsDetails(context, selectedStairs!),
+                child: _buildContent(
+                    context, selectedRoom, selectedStairs, selectedDoor),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _getHeaderTitle(Room? room, Stairs? stairs, Door? door) {
+    if (door != null) return 'Door Details';
+    if (room != null) return 'Room Details';
+    if (stairs != null) return 'Stairs Details';
+    return '';
+  }
+
+  Widget _buildContent(
+      BuildContext context, Room? room, Stairs? stairs, Door? door) {
+    if (door != null) {
+      return _buildDoorDetails(context, door);
+    } else if (room != null) {
+      return _buildRoomDetails(context, room);
+    } else if (stairs != null) {
+      return _buildStairsDetails(context, stairs);
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildRoomDetails(BuildContext context, Room room) {
@@ -112,13 +131,52 @@ class EntityInfoPanel extends StatelessWidget {
           ],
         ),
 
-        // Doors Section
+        // Doors Section (simplified when no door is selected)
         if (room.doors.isNotEmpty)
           InfoSection(
             title: 'Doors (${room.doors.length})',
-            children:
-                room.doors.map((door) => DoorInfoTile(door: door)).toList(),
+            children: room.doors
+                .map((door) => SimpleDoorInfoTile(door: door))
+                .toList(),
           ),
+      ],
+    );
+  }
+
+  // New method for detailed door info
+  Widget _buildDoorDetails(BuildContext context, Door door) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InfoSection(
+          title: 'Door Properties',
+          children: [
+            InfoRow(label: 'Name', value: "door ${door.id.split(':').last}"),
+            InfoRow(label: 'Wall', value: door.wall),
+            InfoRow(label: 'Width', value: '${door.width}ft'),
+            InfoRow(label: 'Offset', value: '${door.offsetFromWallStart}ft'),
+            InfoRow(
+                label: 'Swing', value: door.swingInward ? "Inward" : "Outward"),
+            InfoRow(label: 'Opens', value: door.openLeft ? "Left" : "Right"),
+            if (door.connectedDoor != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.link, size: 16, color: Colors.blue[700]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Connected Door',
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -147,123 +205,6 @@ class EntityInfoPanel extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class InfoSection extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const InfoSection({
-    super.key,
-    required this.title,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-        ),
-        ...children,
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-}
-
-class InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const InfoRow({
-    super.key,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class DoorInfoTile extends StatelessWidget {
-  final Door door;
-
-  const DoorInfoTile({
-    super.key,
-    required this.door,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border.all(color: Colors.grey[200]!),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InfoRow(label: 'ID', value: door.id),
-          InfoRow(label: 'Wall', value: door.wall),
-          InfoRow(label: 'Width', value: '${door.width}ft'),
-          InfoRow(label: 'Offset', value: '${door.offsetFromWallStart}ft'),
-          InfoRow(
-              label: 'Swing', value: door.swingInward ? "Inward" : "Outward"),
-          InfoRow(label: 'Opens', value: door.openLeft ? "Left" : "Right"),
-          if (door.connectedDoor != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.link, size: 16, color: Colors.blue[700]),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Connected Door',
-                    style: TextStyle(
-                      color: Colors.blue[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

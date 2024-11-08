@@ -23,8 +23,8 @@ class FloorPlanController extends ChangeNotifier {
 
   double _zoomLevel = 1.0;
   static const double _zoomIncrement = 0.2;
-  static const double _minZoom = 0.5;
-  static const double _maxZoom = 4.0;
+  static const double _minZoom = 0.25;
+  static const double _maxZoom = 6.0;
 
   // All getters:
   double get zoomLevel => _zoomLevel;
@@ -74,24 +74,24 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  void addDefaultRoom() {
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "Please create a base first");
-      return;
-    }
+  // void addDefaultRoom() {
+  //   if (_floorBase == null) {
+  //     Fluttertoast.showToast(msg: "Please create a base first");
+  //     return;
+  //   }
 
-    const double defaultRoomWidth = 20;
-    const double defaultRoomHeight = 15;
+  //   const double defaultRoomWidth = 20;
+  //   const double defaultRoomHeight = 15;
 
-    // For the first room, position it in the top-left corner with some margin
-    const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
+  //   // For the first room, position it in the top-left corner with some margin
+  //   const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
 
-    addRoom(defaultRoomWidth, defaultRoomHeight, defaultRoomPosition);
-  }
+  //   addRoom(defaultRoomWidth, defaultRoomHeight, defaultRoomPosition);
+  // }
 
   void addNextRoom() {
-    const double defaultRoomWidth = 10;
-    const double defaultRoomHeight = 10;
+    const double defaultRoomWidth = 5;
+    const double defaultRoomHeight = 5;
     addNextRoomWithDimensions(
         width: defaultRoomWidth, height: defaultRoomHeight);
   }
@@ -416,6 +416,7 @@ class FloorPlanController extends ChangeNotifier {
     }
     selectedRoom = null;
     selectedRoomName = null;
+    deselectDoor();
     notifyListeners();
   }
 
@@ -1487,6 +1488,10 @@ class FloorPlanController extends ChangeNotifier {
 
   // Door modification methods
   void moveDoor(String roomName, String doorId, double newOffset) {
+    if (selectedDoor?.id != doorId) {
+      Fluttertoast.showToast(msg: "Please select the door first");
+      return;
+    }
     Room? room = _findRoomByName(roomName);
     if (room == null) return;
 
@@ -1551,6 +1556,10 @@ class FloorPlanController extends ChangeNotifier {
   }
 
   void removeDoor(String roomName, String doorId) {
+    if (selectedDoor?.id != doorId) {
+      Fluttertoast.showToast(msg: "Please select the door first");
+      return;
+    }
     Room? room = _findRoomByName(roomName);
     if (room != selectedRoom) {
       Fluttertoast.showToast(
@@ -1576,9 +1585,14 @@ class FloorPlanController extends ChangeNotifier {
     } catch (e) {
       Fluttertoast.showToast(msg: "Door not found");
     }
+    deselectDoor();
   }
 
   void changeDoorSwing(String roomName, String doorId, bool swingInward) {
+    if (selectedDoor?.id != doorId) {
+      Fluttertoast.showToast(msg: "Please select the door first");
+      return;
+    }
     Room? room = _findRoomByName(roomName);
     if (room != selectedRoom) {
       Fluttertoast.showToast(
@@ -1607,6 +1621,10 @@ class FloorPlanController extends ChangeNotifier {
   // Helper method to change door opening direction (left/right)
   void changeDoorOpeningDirection(
       String roomName, String doorId, bool openLeft) {
+    if (selectedDoor?.id != doorId) {
+      Fluttertoast.showToast(msg: "Please select the door first");
+      return;
+    }
     Room? room = _findRoomByName(roomName);
     if (room != selectedRoom) {
       Fluttertoast.showToast(
@@ -1638,6 +1656,34 @@ class FloorPlanController extends ChangeNotifier {
       for (Door door in selectedRoom!.doors) {
         door.isHighlighted = highlight;
       }
+      notifyListeners();
+    }
+  }
+
+  // Add selected door state
+  Door? selectedDoor;
+
+  // Add door selection methods
+  void selectDoor(String roomName, String doorId) {
+    Room? room = _findRoomByName(roomName);
+    if (room != selectedRoom) {
+      Fluttertoast.showToast(
+          msg: "Please select the room first before selecting a door");
+      return;
+    }
+
+    try {
+      Door door = room!.doors.firstWhere((d) => d.id == doorId);
+      selectedDoor = door;
+      notifyListeners();
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Door not found");
+    }
+  }
+
+  void deselectDoor() {
+    if (selectedDoor != null) {
+      selectedDoor = null;
       notifyListeners();
     }
   }

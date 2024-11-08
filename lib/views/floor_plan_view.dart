@@ -30,10 +30,11 @@ class FloorPlanView extends StatelessWidget {
               controller.selectedRoomName,
               controller.selectedStairs,
               controller.zoomLevel,
+              controller.selectedDoor,
             ),
             size: Size(
-              MediaQuery.of(context).size.width,
-              MediaQuery.of(context).size.height,
+              MediaQuery.sizeOf(context).width,
+              MediaQuery.sizeOf(context).height,
             ),
           ),
         ),
@@ -56,9 +57,16 @@ class FloorPlanPainter extends CustomPainter {
   Stairs? selectedStairs;
   static const double scaleFactor = 24.0; // 1:50 (1ft = 24px)
   final double zoomLevel;
+  final Door? selectedDoor;
 
-  FloorPlanPainter(this.rooms, this.stairs, this.floorBase,
-      this.selectedRoomName, this.selectedStairs, this.zoomLevel);
+  FloorPlanPainter(
+      this.rooms,
+      this.stairs,
+      this.floorBase,
+      this.selectedRoomName,
+      this.selectedStairs,
+      this.zoomLevel,
+      this.selectedDoor);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -341,10 +349,12 @@ class FloorPlanPainter extends CustomPainter {
       double baseTop, double scaleFactor) {
     for (Door door in room.doors) {
       final doorPaint = Paint()
-        ..color = door.isHighlighted ? Colors.blue : Colors.black
-        ..strokeWidth = door.isHighlighted
-            ? room.roomPaint.strokeWidth
-            : room.roomPaint.strokeWidth + 1
+        ..color = door == selectedDoor
+            ? Colors.green
+            : (door.isHighlighted ? Colors.blue : Colors.black)
+        ..strokeWidth = (door == selectedDoor || door.isHighlighted)
+            ? room.roomPaint.strokeWidth + 1
+            : room.roomPaint.strokeWidth
         ..style = PaintingStyle.stroke;
 
       // Convert room position to screen coordinates
