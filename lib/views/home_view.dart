@@ -164,11 +164,16 @@ class _HomeViewState extends State<HomeView> {
                           ),
                         ),
                         // Info Panel
-                        if (_floorManager.getActiveController()?.selectedRoom !=
-                                null ||
+                        if (_floorManager.getActiveController()?.selectedRoom != null ||
                             _floorManager
                                     .getActiveController()
                                     ?.selectedStairs !=
+                                null ||
+                            _floorManager.getActiveController()?.selectedDoor !=
+                                null ||
+                            _floorManager
+                                    .getActiveController()
+                                    ?.selectedWindow !=
                                 null)
                           Expanded(
                             flex: 1, // Takes 20% of the space

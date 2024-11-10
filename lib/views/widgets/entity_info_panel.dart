@@ -3,10 +3,12 @@ import 'package:saysketch_v2/controllers/floor_manager_controller.dart';
 import 'package:saysketch_v2/models/room_model.dart';
 import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/stairs.dart';
+import 'package:saysketch_v2/models/window.dart';
 
 import 'info_row.dart';
 import 'info_section.dart';
 import 'simple_door_info_tile.dart';
+import 'simple_window_info_tile.dart';
 
 class EntityInfoPanel extends StatelessWidget {
   final FloorManagerController floorManagerController;
@@ -22,6 +24,15 @@ class EntityInfoPanel extends StatelessWidget {
     Room? selectedRoom = controller?.selectedRoom;
     Stairs? selectedStairs = controller?.selectedStairs;
     Door? selectedDoor = controller?.selectedDoor;
+    Window? selectedWindow = controller?.selectedWindow;
+
+    // Only return empty container if nothing is selected
+    if (selectedRoom == null &&
+        selectedStairs == null &&
+        selectedDoor == null &&
+        selectedWindow == null) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -52,7 +63,8 @@ class EntityInfoPanel extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _getHeaderTitle(selectedRoom, selectedStairs, selectedDoor),
+                  _getHeaderTitle(selectedRoom, selectedStairs, selectedDoor,
+                      selectedWindow),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -61,7 +73,9 @@ class EntityInfoPanel extends StatelessWidget {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () {
-                      if (selectedDoor != null) {
+                      if (selectedWindow != null) {
+                        controller?.deselectWindow();
+                      } else if (selectedDoor != null) {
                         controller?.deselectDoor();
                       } else if (selectedRoom != null) {
                         controller?.deselectRoom();
@@ -81,8 +95,8 @@ class EntityInfoPanel extends StatelessWidget {
             child: SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: _buildContent(
-                    context, selectedRoom, selectedStairs, selectedDoor),
+                child: _buildContent(context, selectedRoom, selectedStairs,
+                    selectedDoor, selectedWindow),
               ),
             ),
           ),
@@ -91,16 +105,20 @@ class EntityInfoPanel extends StatelessWidget {
     );
   }
 
-  String _getHeaderTitle(Room? room, Stairs? stairs, Door? door) {
+  String _getHeaderTitle(
+      Room? room, Stairs? stairs, Door? door, Window? window) {
+    if (window != null) return 'Window Details';
     if (door != null) return 'Door Details';
     if (room != null) return 'Room Details';
     if (stairs != null) return 'Stairs Details';
     return '';
   }
 
-  Widget _buildContent(
-      BuildContext context, Room? room, Stairs? stairs, Door? door) {
-    if (door != null) {
+  Widget _buildContent(BuildContext context, Room? room, Stairs? stairs,
+      Door? door, Window? window) {
+    if (window != null) {
+      return _buildWindowDetails(context, window);
+    } else if (door != null) {
       return _buildDoorDetails(context, door);
     } else if (room != null) {
       return _buildRoomDetails(context, room);
@@ -131,12 +149,21 @@ class EntityInfoPanel extends StatelessWidget {
           ],
         ),
 
-        // Doors Section (simplified when no door is selected)
+        // Doors Section
         if (room.doors.isNotEmpty)
           InfoSection(
             title: 'Doors (${room.doors.length})',
             children: room.doors
                 .map((door) => SimpleDoorInfoTile(door: door))
+                .toList(),
+          ),
+
+        // Windows Section
+        if (room.windows.isNotEmpty)
+          InfoSection(
+            title: 'Windows (${room.windows.length})',
+            children: room.windows
+                .map((window) => SimpleWindowInfoTile(window: window))
                 .toList(),
           ),
       ],
@@ -202,6 +229,42 @@ class EntityInfoPanel extends StatelessWidget {
               label: 'Direction',
               value: stairs.direction.toUpperCase(),
             ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Add new method for window details
+  Widget _buildWindowDetails(BuildContext context, Window window) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InfoSection(
+          title: 'Window Properties',
+          children: [
+            InfoRow(
+                label: 'Name', value: "window ${window.id.split(':').last}"),
+            InfoRow(label: 'Wall', value: window.wall),
+            InfoRow(label: 'Width', value: '${window.width}ft'),
+            InfoRow(label: 'Offset', value: '${window.offsetFromWallStart}ft'),
+            if (window.connectedWindow != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.link, size: 16, color: Colors.blue[700]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Connected Window',
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ],

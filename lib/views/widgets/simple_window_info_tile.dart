@@ -1,0 +1,38 @@
+import 'package:flutter/material.dart';
+import 'package:saysketch_v2/models/window.dart';
+
+class SimpleWindowInfoTile extends StatelessWidget {
+  final Window window;
+
+  const SimpleWindowInfoTile({super.key, required this.window});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.window, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            "Window ${window.id.split(':').last}",
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          const Spacer(),
+          Text(
+            window.wall,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+          ),
+          if (window.connectedWindow != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Icon(Icons.link, size: 14, color: Colors.blue[700]),
+            ),
+        ],
+      ),
+    );
+  }
+}

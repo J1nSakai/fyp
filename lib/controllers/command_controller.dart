@@ -90,6 +90,11 @@ class CommandController {
       _handleDoorCommand(command, tokens);
       return;
     }
+    // Add window command handling
+    else if (tokens.contains("window") || tokens.contains("windows")) {
+      _handleWindowCommand(command, tokens);
+      return;
+    }
     // Handle base creation commands
     else if (tokens.contains("base") || tokens.contains("bass")) {
       _handleBaseCommand(command, tokens);
@@ -1436,5 +1441,214 @@ class CommandController {
       doorId,
       openLeft,
     );
+  }
+
+  void _handleWindowCommand(String command, List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    if (tokens.contains("add")) {
+      _handleAddWindowCommand(tokens);
+    } else if (tokens.contains("remove") || tokens.contains("delete")) {
+      _handleRemoveWindowCommand(tokens);
+    } else if (tokens.contains("move")) {
+      _handleMoveWindowCommand(tokens);
+    } else if (tokens.contains("select")) {
+      _handleSelectWindowCommand(tokens);
+    } else {
+      MessageService.showMessage(floorManagerController.context,
+          "Invalid window command. Available commands: add, remove, move, select",
+          type: MessageType.error);
+    }
+  }
+
+  void _handleAddWindowCommand(List<String> tokens) {
+    // Extract wall
+    String? wall;
+    for (String direction in [
+      "north",
+      "up",
+      "south",
+      "down",
+      "east",
+      "right",
+      "west",
+      "left"
+    ]) {
+      if (tokens.contains(direction)) {
+        wall = direction;
+        break;
+      }
+    }
+
+    if (wall == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify a wall (north, south, east, or west)",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract offset (if specified) or calculate center position
+    double offset;
+    if (tokens.contains("at")) {
+      int atIndex = tokens.indexOf("at");
+      if (atIndex + 1 < tokens.length) {
+        try {
+          offset = double.parse(tokens[atIndex + 1]);
+        } catch (e) {
+          // If parsing fails, use center position
+          offset = (wall == "north" || wall == "south")
+              ? selectedRoom!.width / 2
+              : selectedRoom!.height / 2;
+        }
+      } else {
+        offset = (wall == "north" || wall == "south")
+            ? selectedRoom!.width / 2
+            : selectedRoom!.height / 2;
+      }
+    } else {
+      // Default to center position
+      offset = (wall == "north" || wall == "south")
+          ? selectedRoom!.width / 2
+          : selectedRoom!.height / 2;
+    }
+
+    // Check for connecting window
+    bool connectToAdjacent = tokens.contains("connecting") ||
+        tokens.contains("connected") ||
+        tokens.contains("connect");
+
+    floorPlanController?.addWindow(selectedRoom!.name, wall, offset,
+        connectToAdjacent: connectToAdjacent);
+  }
+
+  void _handleRemoveWindowCommand(List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract window number
+    int? windowNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "window" && i + 1 < tokens.length) {
+        try {
+          windowNumber = int.parse(tokens[i + 1]);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    if (windowNumber == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify which window to remove",
+          type: MessageType.error);
+      return;
+    }
+
+    String windowId = "${selectedRoom!.name}:w:$windowNumber";
+
+    // First select the window
+    floorPlanController?.selectWindow(selectedRoom!.name, windowId);
+
+    // Then remove it
+    floorPlanController?.removeWindow(selectedRoom!.name, windowId);
+  }
+
+  void _handleMoveWindowCommand(List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract window number
+    int? windowNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "window" && i + 1 < tokens.length) {
+        try {
+          windowNumber = int.parse(tokens[i + 1]);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    if (windowNumber == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please specify which window to move",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract new offset
+    double? newOffset;
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        try {
+          newOffset = double.parse(tokens[toIndex + 1]);
+        } catch (e) {
+          // Handle parsing error
+        }
+      }
+    }
+
+    if (newOffset == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify where to move the window",
+          type: MessageType.error);
+      return;
+    }
+
+    String windowId = "${selectedRoom!.name}:w:$windowNumber";
+
+    // First select the window
+    floorPlanController?.selectWindow(selectedRoom!.name, windowId);
+
+    // Then move it
+    floorPlanController?.moveWindow(selectedRoom!.name, windowId, newOffset);
+  }
+
+  void _handleSelectWindowCommand(List<String> tokens) {
+    if (selectedRoom == null) {
+      MessageService.showMessage(
+          floorManagerController.context, "Please select a room first",
+          type: MessageType.error);
+      return;
+    }
+
+    // Extract window number
+    int? windowNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "window" && i + 1 < tokens.length) {
+        try {
+          windowNumber = int.parse(tokens[i + 1]);
+          break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    if (windowNumber == null) {
+      MessageService.showMessage(floorManagerController.context,
+          "Please specify which window to select",
+          type: MessageType.error);
+      return;
+    }
+
+    String windowId = "${selectedRoom!.name}:w:$windowNumber";
+    floorPlanController?.selectWindow(selectedRoom!.name, windowId);
   }
 }

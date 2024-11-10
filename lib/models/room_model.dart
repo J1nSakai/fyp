@@ -11,6 +11,8 @@ class Room {
   bool hasHiddenWalls = false;
   final List<Door> doors = [];
   int _doorCounter = 0;
+  final List<Window> windows = [];
+  int _windowCounter = 0;
 
   Room(
     this.width,
@@ -31,19 +33,74 @@ class Room {
 
   bool canAddDoor(String wall, double offset, double width) {
     double wallLength =
-        (wall == "north" || wall == "south") ? this.width : height;
-    if (offset + width > wallLength) return false;
-
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? this.width
+            : height;
     if (offset < Door.minDistanceFromCorner ||
-        offset > wallLength - width - Door.minDistanceFromCorner) return false;
+        offset + width > wallLength - Door.minDistanceFromCorner) {
+      return false;
+    }
 
-    for (Door door in doors.where((d) => d.wall == wall)) {
-      if ((offset >= door.offsetFromWallStart - Door.minDistanceBetweenDoors) &&
-          (offset <=
-              door.offsetFromWallStart +
-                  door.width +
-                  Door.minDistanceBetweenDoors)) {
-        return false;
+    for (Door existingDoor in doors) {
+      if (existingDoor.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingDoor.offsetFromWallStart,
+            existingDoor.width, Door.minDistanceBetweenDoors)) {
+          return false;
+        }
+      }
+    }
+
+    for (Window existingWindow in windows) {
+      if (existingWindow.wall == wall) {
+        if (_doElementsOverlap(
+            offset,
+            width,
+            existingWindow.offsetFromWallStart,
+            existingWindow.width,
+            Door.minDistanceFromWindows)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  String getNextWindowId() {
+    _windowCounter++;
+    return "$name:w:$_windowCounter";
+  }
+
+  bool canAddWindow(String wall, double offset, double width) {
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? this.width
+            : height;
+
+    if (offset < Window.minDistanceFromCorner ||
+        offset + width > wallLength - Window.minDistanceFromCorner) {
+      return false;
+    }
+
+    for (Window existingWindow in windows) {
+      if (existingWindow.wall == wall) {
+        if (_doElementsOverlap(
+            offset,
+            width,
+            existingWindow.offsetFromWallStart,
+            existingWindow.width,
+            Window.minDistanceBetweenWindows)) {
+          return false;
+        }
+      }
+    }
+
+    for (Door existingDoor in doors) {
+      if (existingDoor.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingDoor.offsetFromWallStart,
+            existingDoor.width, Window.minDistanceFromDoors)) {
+          return false;
+        }
       }
     }
 
@@ -53,5 +110,15 @@ class Room {
   @override
   String toString() {
     return "{width: $width, height: $height, position: ${position.dx}x${position.dy}, name: $name}";
+  }
+
+  bool _doElementsOverlap(double offset1, double width1, double offset2,
+      double width2, double minDistance) {
+    return (offset1 - minDistance <= offset2 + width2) &&
+        (offset1 + width1 + minDistance >= offset2);
+  }
+
+  void clearHighlight() {
+    roomPaint.color = Colors.black;
   }
 }

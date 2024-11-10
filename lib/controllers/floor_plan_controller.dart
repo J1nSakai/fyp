@@ -5,6 +5,7 @@ import 'package:saysketch_v2/models/floor_base_model.dart';
 import 'package:saysketch_v2/models/stairs.dart';
 import 'package:saysketch_v2/services/message_service.dart';
 import '../models/room_model.dart';
+import '../models/window.dart';
 
 class FloorPlanController extends ChangeNotifier {
   FloorBase? _floorBase;
@@ -25,6 +26,8 @@ class FloorPlanController extends ChangeNotifier {
   static const double _zoomIncrement = 0.2;
   static const double _minZoom = 0.25;
   static const double _maxZoom = 6.0;
+
+  Window? selectedWindow;
 
   // All getters:
   double get zoomLevel => _zoomLevel;
@@ -411,8 +414,7 @@ class FloorPlanController extends ChangeNotifier {
 
   void deselectRoom() {
     if (selectedRoom != null) {
-      selectedRoom!.roomPaint.color =
-          selectedRoom!.hasHiddenWalls ? Colors.transparent : Colors.black;
+      selectedRoom!.clearHighlight();
     }
     selectedRoom = null;
     selectedRoomName = null;
@@ -1578,14 +1580,10 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
     Room? room = _findRoomByName(roomName);
-    if (room != selectedRoom) {
-      Fluttertoast.showToast(
-          msg: "Please select the room first before removing doors");
-      return;
-    }
+    if (room == null) return;
 
     try {
-      Door door = room!.doors.firstWhere((d) => d.id == doorId);
+      Door door = room.doors.firstWhere((d) => d.id == doorId);
 
       // Remove connected door first if it exists
       if (door.connectedDoor != null) {
@@ -1683,15 +1681,22 @@ class FloorPlanController extends ChangeNotifier {
   // Add door selection methods
   void selectDoor(String roomName, String doorId) {
     Room? room = _findRoomByName(roomName);
-    if (room != selectedRoom) {
-      Fluttertoast.showToast(
-          msg: "Please select the room first before selecting a door");
+    if (room == null) {
+      Fluttertoast.showToast(msg: "Room not found");
       return;
     }
 
     try {
-      Door door = room!.doors.firstWhere((d) => d.id == doorId);
-      selectedDoor = door;
+      Door door = room.doors.firstWhere((d) => d.id == doorId);
+      // Clear highlight of previously selected room
+      if (selectedRoom != null) {
+        selectedRoom!.clearHighlight();
+        selectedRoom = null;
+        selectedRoomName = null;
+      }
+      selectedStairs = null;
+      selectedWindow = null;
+      selectedDoor = door; // Set the selected door
       notifyListeners();
     } catch (e) {
       Fluttertoast.showToast(msg: "Door not found");
@@ -1703,5 +1708,316 @@ class FloorPlanController extends ChangeNotifier {
       selectedDoor = null;
       notifyListeners();
     }
+  }
+
+  // Add window management methods
+  void addWindow(String roomName, String wall, double offset,
+      {double width = Window.defaultWidth, bool connectToAdjacent = false}) {
+    Room? room = _findRoomByName(roomName);
+    if (room != selectedRoom) {
+      Fluttertoast.showToast(
+          msg: "Please select the room first before adding windows");
+      return;
+    }
+
+    // Validate wall name
+    if (!["north", "south", "east", "west", "up", "down", "left", "right"]
+        .contains(wall.toLowerCase())) {
+      Fluttertoast.showToast(msg: "Invalid wall specified.");
+      return;
+    }
+
+    // Calculate window width based on room dimensions
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? room!.width
+            : room!.height;
+
+    // Set window width to 1/3 of wall length, but not more than 4 feet
+    double calculatedWidth = (wallLength / 3).clamp(2.0, 4.0);
+
+    // Adjust offset if it would place the window too close to edges
+    double maxOffset =
+        wallLength - calculatedWidth - Window.minDistanceFromCorner;
+    double minOffset = Window.minDistanceFromCorner;
+    double adjustedOffset = offset.clamp(minOffset, maxOffset);
+
+    // Create the window with adjusted dimensions
+    Window newWindow = Window(
+      id: room.getNextWindowId(),
+      width: calculatedWidth,
+      offsetFromWallStart: adjustedOffset,
+      wall: wall.toLowerCase(),
+    );
+
+    // Validate window placement
+    if (!room.canAddWindow(wall, adjustedOffset, calculatedWidth)) {
+      Fluttertoast.showToast(
+          msg:
+              "Invalid window position. Check distance from corners, doors, and other windows.");
+      return;
+    }
+
+    // Handle connecting window
+    if (connectToAdjacent) {
+      Window? connectedWindow = _createConnectingWindow(room, newWindow);
+      if (connectedWindow != null) {
+        newWindow.connectedWindow = connectedWindow;
+        connectedWindow.connectedWindow = newWindow;
+      }
+    }
+
+    room.windows.add(newWindow);
+    notifyListeners();
+    Fluttertoast.showToast(msg: "Window added successfully to ${room.name}");
+  }
+
+  Window? _createConnectingWindow(Room sourceRoom, Window sourceWindow) {
+    Room? adjacentRoom =
+        _findAdjacentRoomBasedOnWall(sourceRoom, sourceWindow.wall);
+    if (adjacentRoom == null) {
+      Fluttertoast.showToast(
+          msg: "No adjacent room found for connecting window");
+      return null;
+    }
+
+    String oppositeWall = _getOppositeWall(sourceWindow.wall);
+    double adjacentOffset =
+        _calculateAdjacentOffset(sourceRoom, adjacentRoom, sourceWindow);
+
+    if (!adjacentRoom.canAddWindow(
+        oppositeWall, adjacentOffset, sourceWindow.width)) {
+      Fluttertoast.showToast(
+          msg: "Cannot place connecting window in adjacent room");
+      return null;
+    }
+
+    Window connectingWindow = Window(
+      id: adjacentRoom.getNextWindowId(),
+      width: sourceWindow.width,
+      offsetFromWallStart: adjacentOffset,
+      wall: oppositeWall,
+    );
+
+    adjacentRoom.windows.add(connectingWindow);
+    return connectingWindow;
+  }
+
+  void selectWindow(String roomName, String windowId) {
+    Room? room = _findRoomByName(roomName);
+    if (room == null) {
+      Fluttertoast.showToast(msg: "Room not found");
+      return;
+    }
+
+    try {
+      Window window = room.windows.firstWhere((w) => w.id == windowId);
+      // Clear highlight of previously selected room
+      if (selectedRoom != null) {
+        selectedRoom!.clearHighlight();
+        selectedRoom = null;
+        selectedRoomName = null;
+      }
+      selectedStairs = null;
+      selectedDoor = null;
+      selectedWindow = window; // Set the selected window
+      notifyListeners();
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Window not found");
+    }
+  }
+
+  void deselectWindow() {
+    selectedWindow = null;
+    notifyListeners();
+  }
+
+  void removeWindow(String roomName, String windowId) {
+    if (selectedWindow?.id != windowId) {
+      Fluttertoast.showToast(msg: "Please select the window first");
+      return;
+    }
+
+    Room? room = _findRoomByName(roomName);
+    if (room != selectedRoom) {
+      Fluttertoast.showToast(
+          msg: "Please select the room first before removing windows");
+      return;
+    }
+
+    try {
+      Window window = room!.windows.firstWhere((w) => w.id == windowId);
+
+      // Remove connected window first if it exists
+      if (window.connectedWindow != null) {
+        Room? connectedRoom = _findRoomByWindow(window.connectedWindow!);
+        if (connectedRoom != null) {
+          connectedRoom.windows.remove(window.connectedWindow);
+        }
+      }
+
+      room.windows.remove(window);
+      deselectWindow();
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Window removed from ${room.name}");
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Window not found");
+    }
+  }
+
+  void moveWindow(String roomName, String windowId, double newOffset) {
+    if (selectedWindow?.id != windowId) {
+      Fluttertoast.showToast(msg: "Please select the window first");
+      return;
+    }
+
+    Room? room = _findRoomByName(roomName);
+    if (room != selectedRoom) {
+      Fluttertoast.showToast(
+          msg: "Please select the room first before moving windows");
+      return;
+    }
+
+    try {
+      Window window = room!.windows.firstWhere((w) => w.id == windowId);
+
+      // Validate new position
+      if (room.canAddWindow(window.wall, newOffset, window.width)) {
+        window.offsetFromWallStart = newOffset;
+
+        // Update connected window if exists
+        if (window.connectedWindow != null) {
+          Room? connectedRoom = _findRoomByWindow(window.connectedWindow!);
+          if (connectedRoom != null) {
+            double newConnectedOffset =
+                _calculateAdjacentOffset(room, connectedRoom, window);
+            window.connectedWindow!.offsetFromWallStart = newConnectedOffset;
+          }
+        }
+
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Window moved in ${room.name}");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid window position. Check distance from corners, doors, and other windows.");
+      }
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Window not found");
+    }
+  }
+
+  // Helper method to find room by window
+  Room? _findRoomByWindow(Window window) {
+    try {
+      return _rooms.firstWhere((room) => room.windows.contains(window));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  double _calculateAdjacentOffset(
+      Room sourceRoom, Room adjacentRoom, Window sourceWindow) {
+    // Get the dimensions of both rooms
+    double sourceWallLength = (sourceWindow.wall == "north" ||
+            sourceWindow.wall == "south" ||
+            sourceWindow.wall == "up" ||
+            sourceWindow.wall == "down")
+        ? sourceRoom.width
+        : sourceRoom.height;
+
+    double adjacentWallLength = (sourceWindow.wall == "north" ||
+            sourceWindow.wall == "south" ||
+            sourceWindow.wall == "up" ||
+            sourceWindow.wall == "down")
+        ? adjacentRoom.width
+        : adjacentRoom.height;
+
+    // Calculate the relative position as a percentage of the wall length
+    double relativePosition =
+        sourceWindow.offsetFromWallStart / sourceWallLength;
+
+    // Apply the same relative position to the adjacent wall
+    return relativePosition * adjacentWallLength;
+  }
+
+  // This is a helper method to find adjacent room based on wall
+  Room? _findAdjacentRoomBasedOnWall(Room sourceRoom, String wall) {
+    double tolerance = 0.1; // Small tolerance for floating-point comparisons
+
+    for (Room room in _rooms) {
+      if (room == sourceRoom) continue;
+
+      switch (wall.toLowerCase()) {
+        case "north":
+        case "up":
+          if ((sourceRoom.position.dy - tolerance) <=
+                  (room.position.dy + room.height) &&
+              (sourceRoom.position.dy + tolerance) >=
+                  (room.position.dy + room.height) &&
+              _wallsOverlap(sourceRoom.position.dx, sourceRoom.width,
+                  room.position.dx, room.width)) {
+            return room;
+          }
+          break;
+
+        case "south":
+        case "down":
+          if ((sourceRoom.position.dy + sourceRoom.height - tolerance) <=
+                  room.position.dy &&
+              (sourceRoom.position.dy + sourceRoom.height + tolerance) >=
+                  room.position.dy &&
+              _wallsOverlap(sourceRoom.position.dx, sourceRoom.width,
+                  room.position.dx, room.width)) {
+            return room;
+          }
+          break;
+
+        case "east":
+        case "right":
+          if ((sourceRoom.position.dx + sourceRoom.width - tolerance) <=
+                  room.position.dx &&
+              (sourceRoom.position.dx + sourceRoom.width + tolerance) >=
+                  room.position.dx &&
+              _wallsOverlap(sourceRoom.position.dy, sourceRoom.height,
+                  room.position.dy, room.height)) {
+            return room;
+          }
+          break;
+
+        case "west":
+        case "left":
+          if ((sourceRoom.position.dx - tolerance) <=
+                  (room.position.dx + room.width) &&
+              (sourceRoom.position.dx + tolerance) >=
+                  (room.position.dx + room.width) &&
+              _wallsOverlap(sourceRoom.position.dy, sourceRoom.height,
+                  room.position.dy, room.height)) {
+            return room;
+          }
+          break;
+      }
+    }
+    return null;
+  }
+
+  // Helper method to check if walls overlap
+  bool _wallsOverlap(double pos1, double length1, double pos2, double length2) {
+    double tolerance = 0.1;
+    return (pos1 + tolerance < pos2 + length2) &&
+        (pos1 + length1 - tolerance > pos2);
+  }
+
+  // Add a method to deselect all entities
+  void deselectAll() {
+    if (selectedRoom != null) {
+      selectedRoom!.clearHighlight();
+    }
+    selectedRoom = null;
+    selectedRoomName = null;
+    selectedDoor = null;
+    selectedWindow = null;
+    selectedStairs = null;
+    notifyListeners();
   }
 }
