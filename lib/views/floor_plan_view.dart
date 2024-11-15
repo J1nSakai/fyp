@@ -96,6 +96,7 @@ class FloorPlanPainter extends CustomPainter {
 
     // Draw base if present
     if (floorBase != null) {
+      print("Drawing base: $floorBase"); // Debug print
       final baseWidthInPixels = floorBase!.width * adjustedScaleFactor;
       final baseHeightInPixels = floorBase!.height * adjustedScaleFactor;
 
@@ -126,7 +127,14 @@ class FloorPlanPainter extends CustomPainter {
           room.height * adjustedScaleFactor,
         );
 
-        canvas.drawRect(roomRect, room.roomPaint);
+        // Draw normal room walls if not hidden
+        if (!room.hasHiddenWalls) {
+          Paint normalPaint = Paint()
+            ..color = Colors.black
+            ..strokeWidth = room.roomPaint.strokeWidth
+            ..style = PaintingStyle.stroke;
+          canvas.drawRect(roomRect, normalPaint);
+        }
 
         // Draw room label
         final roomCenterX = roomLeft + (room.width * adjustedScaleFactor / 2);
@@ -151,11 +159,13 @@ class FloorPlanPainter extends CustomPainter {
           ),
         );
 
-        if (selectedRoomName != null) {
-          if (room.name == selectedRoomName) {
-            room.roomPaint.color = Colors.red;
-            canvas.drawRect(roomRect, room.roomPaint);
-          }
+        // Always draw selection highlight if room is selected, regardless of hidden walls
+        if (selectedRoomName != null && room.name == selectedRoomName) {
+          Paint selectionPaint = Paint()
+            ..color = Colors.red
+            ..strokeWidth = room.roomPaint.strokeWidth
+            ..style = PaintingStyle.stroke;
+          canvas.drawRect(roomRect, selectionPaint);
         }
       }
 
@@ -185,6 +195,9 @@ class FloorPlanPainter extends CustomPainter {
         ),
       );
     }
+    //else {
+    //   print("No base to draw"); // Debug print
+    // }
 
     for (Stairs stair in stairs) {
       final baseWidthInPixels = floorBase!.width * adjustedScaleFactor;
@@ -528,7 +541,7 @@ class FloorPlanPainter extends CustomPainter {
     for (Window window in room.windows) {
       final windowPaint = Paint()
         ..color = window == selectedWindow
-            ? Colors.green
+            ? Colors.yellow
             : (window.isHighlighted ? Colors.blue : Colors.black)
         ..strokeWidth =
             room.roomPaint.strokeWidth * 0.25 // Match room's stroke width

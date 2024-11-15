@@ -21,6 +21,23 @@ class CommandController {
     command = command.toLowerCase();
     List<String> tokens = command.split(" ");
 
+    if (tokens.contains("undo")) {
+      // TODO: Implement undo
+      // In your command handler when processing the "undo" command:
+      // print("Before undo:");
+      // floorPlanController?.printState();
+      // floorPlanController?.undo();
+      // print("After undo:");
+      // floorPlanController?.printState();
+      return;
+    }
+
+    if (tokens.contains("redo")) {
+      // TODO: Implement redo
+      // floorPlanController?.redo();
+      return;
+    }
+
     if ((tokens.contains("new") || tokens.contains("add")) &&
         (tokens.contains("floor") ||
             tokens.contains("flower") ||
@@ -193,46 +210,55 @@ class CommandController {
   }
 
   void _handleRemoveCommand(List<String> tokens) {
-    if (selectedRoom != null) {
-      if (tokens.contains("wall") ||
-          tokens.contains("walls") ||
-          tokens.contains("boundary") ||
-          tokens.contains("boundaries")) {
-        selectedRoom!.roomPaint.color = Colors.transparent;
-      } else {
+    // Check for door removal first
+    if (tokens.contains("door")) {
+      if (floorPlanController?.selectedDoor == null) {
         MessageService.showMessage(
-            floorManagerController.context, "'${selectedRoom!.name}' removed.",
-            type: MessageType.success);
-        floorPlanController?.removeSelectedRoom();
-        selectedRoom = null;
-      }
-    } else if (floorPlanController?.selectedStairs != null) {
-      MessageService.showMessage(floorManagerController.context,
-          "'${floorPlanController?.selectedStairs!.name}' removed.",
-          type: MessageType.success);
-      floorPlanController?.removeSelectedStairs();
-    } else {
-      if (tokens.contains("base") || tokens.contains("bass")) {
-        floorPlanController?.removeBase();
-        MessageService.showMessage(
-            floorManagerController.context, "Base removed",
-            type: MessageType.success);
-      } else if (tokens.contains("rooms") || tokens.contains("all")) {
-        floorPlanController?.removeAllRooms();
-        MessageService.showMessage(
-            floorManagerController.context, "All rooms removed",
-            type: MessageType.success);
-      } else if (tokens.contains("last") &&
-          (tokens.contains("room") || tokens.contains("rooms"))) {
-        floorPlanController?.removeLastAddedRoom();
-        MessageService.showMessage(
-            floorManagerController.context, "Last room removed",
-            type: MessageType.success);
-      } else {
-        MessageService.showMessage(floorManagerController.context,
-            "Please specify what to remove (base, rooms, or last room)",
+            floorManagerController.context, "Please select a door first",
             type: MessageType.error);
+        return;
       }
+      floorPlanController?.removeSelectedDoor();
+      return;
+    }
+
+    // Check for window removal
+    if (tokens.contains("window")) {
+      if (floorPlanController?.selectedWindow == null) {
+        MessageService.showMessage(
+            floorManagerController.context, "Please select a window first",
+            type: MessageType.error);
+        return;
+      }
+      floorPlanController?.removeSelectedWindow();
+      return;
+    }
+
+    // Handle other remove commands (rooms, base, etc.)
+    if (tokens.contains("base")) {
+      floorPlanController?.removeBase();
+      return;
+    }
+
+    if (tokens.contains("rooms")) {
+      floorPlanController?.removeAllRooms();
+      return;
+    }
+
+    if (tokens.contains("last") && tokens.contains("room")) {
+      floorPlanController?.removeLastAddedRoom();
+      return;
+    }
+
+    if (tokens.contains("room")) {
+      if (selectedRoom == null) {
+        MessageService.showMessage(
+            floorManagerController.context, "Please select a room first",
+            type: MessageType.error);
+        return;
+      }
+      floorPlanController?.removeSelectedRoom();
+      return;
     }
   }
 
@@ -297,13 +323,12 @@ class CommandController {
         // Handle predefined positions for stairs
         for (String position in [
           "center",
-          "topleft",
-          "topright",
-          "bottomleft",
-          "bottomright",
+          "top",
+          "bottom",
         ]) {
           if (tokens.contains(position)) {
-            floorPlanController?.moveStairsToPosition(position);
+            floorPlanController?.moveStairsToPosition(
+                position, tokens, context);
             return;
           }
         }
@@ -385,13 +410,11 @@ class CommandController {
         // Handle predefined positions for rooms
         for (String position in [
           "center",
-          "topleft",
-          "topright",
-          "bottomleft",
-          "bottomright"
+          "top",
+          "bottom",
         ]) {
           if (tokens.contains(position)) {
-            floorPlanController?.moveRoomToPosition(position, context);
+            floorPlanController?.moveRoomToPosition(position, tokens, context);
             return;
           }
         }
@@ -424,6 +447,23 @@ class CommandController {
             }
           }
         }
+        // else {
+        //   for (String direction in [
+        //     "right",
+        //     "left",
+        //     "up",
+        //     "down",
+        //     "north",
+        //     "south",
+        //     "east",
+        //     "west"
+        //   ]) {
+        //     if (tokens.contains(direction)) {
+        //       floorPlanController?.moveRoomToPosition(
+        //           direction, tokens, context);
+        //     }
+        //   }
+        // }
       }
 
       // Rest of room movement handling...
@@ -492,6 +532,7 @@ class CommandController {
             type: MessageType.error);
       }
     } else {
+      // Use default dimensions
       floorPlanController?.setDefaultBase();
       MessageService.showMessage(
           floorManagerController.context, "Default base created",
@@ -686,8 +727,9 @@ class CommandController {
   }
 
   Map<String, double> extractMeasurements(String command) {
+    // Updated regex to handle decimal numbers
     RegExp regExp = RegExp(
-        r'(\d+)\s*(feet|meters|foot|ft)?\s*(?:by|x|\/)\s*(\d+)\s*(feet|meters|foot|ft)?');
+        r'(\d*\.?\d+)\s*(feet|meters|foot|ft)?\s*(?:by|x|\/)\s*(\d*\.?\d+)\s*(feet|meters|foot|ft)?');
     var match = regExp.firstMatch(command);
 
     if (match != null) {
@@ -709,7 +751,6 @@ class CommandController {
 
       return {'width': width, 'height': height};
     }
-
     return {};
   }
 
@@ -1104,7 +1145,7 @@ class CommandController {
     if (tokens.contains("add")) {
       _handleAddDoorCommand(command, tokens);
     } else if (tokens.contains("move")) {
-      _handleMoveDoorCommand(command, tokens);
+      _handleMoveDoorCommand(tokens);
     } else if (tokens.contains("swing")) {
       _handleDoorSwingCommand(tokens);
     } else if (tokens.contains("remove") || tokens.contains("delete")) {
@@ -1239,30 +1280,10 @@ class CommandController {
     return (wallLength - Door.defaultWidth) / 2;
   }
 
-  void _handleMoveDoorCommand(String command, List<String> tokens) {
-    if (selectedRoom == null) {
+  void _handleMoveDoorCommand(List<String> tokens) {
+    if (floorPlanController?.selectedDoor == null) {
       MessageService.showMessage(
-          floorManagerController.context, "Please select a room first",
-          type: MessageType.error);
-      return;
-    }
-
-    // Extract door number
-    int? doorNumber;
-    for (int i = 0; i < tokens.length; i++) {
-      if (tokens[i] == "door" && i + 1 < tokens.length) {
-        try {
-          doorNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    if (doorNumber == null) {
-      MessageService.showMessage(
-          floorManagerController.context, "Please specify which door to move",
+          floorManagerController.context, "Please select a door first",
           type: MessageType.error);
       return;
     }
@@ -1282,13 +1303,13 @@ class CommandController {
 
     if (newOffset == null) {
       MessageService.showMessage(floorManagerController.context,
-          "Please specify where to move the door",
+          "Please specify where to move the door (e.g., 'move door to 3')",
           type: MessageType.error);
       return;
     }
 
-    String doorId = "${selectedRoom!.name}:$doorNumber";
-    floorPlanController?.moveDoor(selectedRoom!.name, doorId, newOffset);
+    // Move the selected door
+    floorPlanController?.moveDoor(newOffset);
   }
 
   void _handleDoorSwingCommand(List<String> tokens) {
@@ -1339,41 +1360,14 @@ class CommandController {
   }
 
   void _handleRemoveDoorCommand(List<String> tokens) {
-    if (selectedRoom == null) {
+    if (floorPlanController?.selectedDoor == null) {
       MessageService.showMessage(
-          floorManagerController.context, "Please select a room first",
+          floorManagerController.context, "Please select a door first",
           type: MessageType.error);
       return;
     }
 
-    // Handle "remove all doors"
-    if (tokens.contains("all")) {
-      floorPlanController?.removeAllDoors(selectedRoom!.name);
-      return;
-    }
-
-    // Extract door number
-    int? doorNumber;
-    for (int i = 0; i < tokens.length; i++) {
-      if (tokens[i] == "door" && i + 1 < tokens.length) {
-        try {
-          doorNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    if (doorNumber == null) {
-      MessageService.showMessage(
-          floorManagerController.context, "Please specify which door to remove",
-          type: MessageType.error);
-      return;
-    }
-
-    floorPlanController?.removeDoor(
-        selectedRoom!.name, "${selectedRoom!.name}:$doorNumber");
+    floorPlanController?.removeSelectedDoor();
   }
 
   void _handleDoorOpeningDirectionCommand(List<String> tokens) {
@@ -1564,29 +1558,9 @@ class CommandController {
   }
 
   void _handleMoveWindowCommand(List<String> tokens) {
-    if (selectedRoom == null) {
+    if (floorPlanController?.selectedWindow == null) {
       MessageService.showMessage(
-          floorManagerController.context, "Please select a room first",
-          type: MessageType.error);
-      return;
-    }
-
-    // Extract window number
-    int? windowNumber;
-    for (int i = 0; i < tokens.length; i++) {
-      if (tokens[i] == "window" && i + 1 < tokens.length) {
-        try {
-          windowNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    if (windowNumber == null) {
-      MessageService.showMessage(
-          floorManagerController.context, "Please specify which window to move",
+          floorManagerController.context, "Please select a window first",
           type: MessageType.error);
       return;
     }
@@ -1606,18 +1580,13 @@ class CommandController {
 
     if (newOffset == null) {
       MessageService.showMessage(floorManagerController.context,
-          "Please specify where to move the window",
+          "Please specify where to move the window (e.g., 'move window to 3')",
           type: MessageType.error);
       return;
     }
 
-    String windowId = "${selectedRoom!.name}:w:$windowNumber";
-
-    // First select the window
-    floorPlanController?.selectWindow(selectedRoom!.name, windowId);
-
-    // Then move it
-    floorPlanController?.moveWindow(selectedRoom!.name, windowId, newOffset);
+    // Move the selected window
+    floorPlanController?.moveWindow(newOffset);
   }
 
   void _handleSelectWindowCommand(List<String> tokens) {

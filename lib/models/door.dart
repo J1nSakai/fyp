@@ -24,4 +24,51 @@ class Door {
     this.connectedDoor,
     this.isHighlighted = false,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'width': width,
+      'offsetFromWallStart': offsetFromWallStart,
+      'wall': wall,
+      'swingInward': swingInward,
+      'openLeft': openLeft,
+      'isHighlighted': isHighlighted,
+      'connectedDoorId':
+          connectedDoor?.id, // Store only the ID of connected door
+    };
+  }
+
+  factory Door.fromJson(Map<String, dynamic> json) {
+    return Door(
+      id: json['id'],
+      width: json['width'] ?? defaultWidth,
+      offsetFromWallStart: json['offsetFromWallStart'],
+      wall: json['wall'],
+      swingInward: json['swingInward'] ?? true,
+      openLeft: json['openLeft'] ?? true,
+      isHighlighted: json['isHighlighted'] ?? false,
+    );
+  }
+
+  // Helper method to restore connected doors after all doors are created
+  void restoreConnectedDoor(Map<String, Door> allDoors) {
+    final connectedDoorId = allDoors[id]?.connectedDoor?.id;
+    if (connectedDoorId != null && allDoors.containsKey(connectedDoorId)) {
+      connectedDoor = allDoors[connectedDoorId];
+    }
+  }
+
+  // Optional: Create a copy of the door
+  Door copy() {
+    return Door(
+      id: id,
+      width: width,
+      offsetFromWallStart: offsetFromWallStart,
+      wall: wall,
+      swingInward: swingInward,
+      openLeft: openLeft,
+      isHighlighted: isHighlighted,
+    );
+  }
 }

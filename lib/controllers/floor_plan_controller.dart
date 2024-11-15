@@ -8,6 +8,11 @@ import '../models/room_model.dart';
 import '../models/window.dart';
 
 class FloorPlanController extends ChangeNotifier {
+  FloorPlanController() {
+    // Don't save state immediately in constructor
+    // _saveState(); // Remove this line
+  }
+
   FloorBase? _floorBase;
   final List<Room> _rooms = [];
   int _roomCounter = 0;
@@ -17,6 +22,7 @@ class FloorPlanController extends ChangeNotifier {
   Stairs? selectedStairs;
   Room? selectedRoom;
   String? selectedRoomName;
+  Door? selectedDoor;
 
   late Color originalColor;
 
@@ -28,6 +34,12 @@ class FloorPlanController extends ChangeNotifier {
   static const double _maxZoom = 6.0;
 
   Window? selectedWindow;
+
+  // Add these properties for state management
+  final List<Map<String, dynamic>> _undoStack = [];
+  final List<Map<String, dynamic>> _redoStack = [];
+  static const int maxUndoSteps =
+      20; // Limit stack size to prevent memory issues
 
   // All getters:
   double get zoomLevel => _zoomLevel;
@@ -46,16 +58,39 @@ class FloorPlanController extends ChangeNotifier {
 
   // All base building methods:
   void setDefaultBase() {
-    const double defaultBaseWidth = 30.0;
-    const double defaultBaseHeight = 20.0;
-    const Offset defaultBasePosition = Offset(0, 0);
+    // Save the current state before making changes
+    if (_floorBase != null) {
+      // _saveState()();
+    }
 
-    _floorBase =
-        FloorBase(defaultBaseWidth, defaultBaseHeight, defaultBasePosition);
+    _floorBase = FloorBase(30.0, 20.0, const Offset(0, 0));
+    // _saveState()(); // Save the new state
+    notifyListeners();
   }
 
   void setBase(double width, double height, Offset position) {
+    // Save the current state before making changes
+    if (_floorBase != null) {
+      // _saveState()();
+    }
+
     _floorBase = FloorBase(width, height, position);
+    // _saveState()(); // Make sure this is called
+    notifyListeners();
+    print("Base set: $_floorBase"); // Debug print
+  }
+
+  void removeBase() {
+    _floorBase = null;
+    // _saveState()();
+    notifyListeners();
+  }
+
+  // Add helper method for restoring stairs
+  void restoreStairs(Stairs stairs) {
+    _stairs.add(stairs);
+    // _saveState()();
+    notifyListeners();
   }
 
   // All room building methods:
@@ -69,6 +104,8 @@ class FloorPlanController extends ChangeNotifier {
       if (_roomDoesNotOverlapWithOtherRooms(width, height, position)) {
         _roomCounter++;
         _rooms.add(Room(width, height, position, "room $_roomCounter"));
+        // _saveState()();
+        notifyListeners();
       } else {
         Fluttertoast.showToast(msg: "Room overlaps with existing rooms.");
       }
@@ -331,6 +368,8 @@ class FloorPlanController extends ChangeNotifier {
         direction: direction,
         numberOfSteps: numberOfSteps,
         name: "stairs $_stairsCounter"));
+    // _saveState()();
+    notifyListeners();
     Fluttertoast.showToast(msg: "Stairs added successfully");
   }
 
@@ -355,29 +394,28 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  // All base removal methods:
-  void removeBase() {
-    removeAllRooms();
-    removeAllStairs();
-    _floorBase = null;
-  }
-
   // All room removal methods:
   void removeAllRooms() {
     _roomCounter = 0;
     _rooms.clear();
+    // _saveState()();
+    notifyListeners();
   }
 
   void removeLastAddedRoom() {
     if (_rooms.isNotEmpty) {
       _rooms.removeLast();
       _roomCounter--;
+      // _saveState()();
+      notifyListeners();
     }
   }
 
   void removeSelectedRoom() {
     _rooms.remove(selectedRoom);
     deselectRoom();
+    // _saveState()();
+    notifyListeners();
   }
 
   // All stairs removal methods:
@@ -385,6 +423,8 @@ class FloorPlanController extends ChangeNotifier {
     if (selectedStairs != null) {
       _stairs.remove(selectedStairs);
       deselectStairs();
+      // _saveState()();
+      notifyListeners();
     }
   }
 
@@ -392,6 +432,8 @@ class FloorPlanController extends ChangeNotifier {
     _stairs.clear();
     _stairsCounter = 0;
     deselectStairs();
+    // _saveState()();
+    notifyListeners();
   }
 
   // All room selection methods:
@@ -425,6 +467,8 @@ class FloorPlanController extends ChangeNotifier {
   // Room renaming method:
   void renameRoom(String name) {
     selectedRoom!.name = name;
+    // _saveState()();
+    notifyListeners();
   }
 
   // All room movement methods:
@@ -465,6 +509,8 @@ class FloorPlanController extends ChangeNotifier {
       if (!wouldOverlap) {
         selectedRoom!.position = newPosition;
         Fluttertoast.showToast(msg: "Room moved successfully");
+        // _saveState()();
+        notifyListeners();
       } else {
         Fluttertoast.showToast(
             msg: "Cannot move room - would overlap with other rooms");
@@ -474,7 +520,8 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  void moveRoomToPosition(String position, BuildContext context) {
+  void moveRoomToPosition(
+      String position, List<String> tokens, BuildContext context) {
     if (selectedRoom == null || _floorBase == null) {
       Fluttertoast.showToast(
           msg: "Please select a room and ensure base exists");
@@ -489,22 +536,28 @@ class FloorPlanController extends ChangeNotifier {
         newX = (_floorBase!.width - selectedRoom!.width) / 2;
         newY = (_floorBase!.height - selectedRoom!.height) / 2;
         break;
-      case "topleft":
-        newX = roomSpacing;
-        newY = roomSpacing;
+      case "top":
+        if (tokens.contains("left")) {
+          newX = roomSpacing;
+          newY = roomSpacing;
+        } else if (tokens.contains("right")) {
+          newX = _floorBase!.width - selectedRoom!.width - roomSpacing;
+          newY = roomSpacing;
+        }
         break;
-      case "topright":
-        newX = _floorBase!.width - selectedRoom!.width - roomSpacing;
-        newY = roomSpacing;
+      // case "topright":
+      //   break;
+      case "bottom":
+        if (tokens.contains("left")) {
+          newX = roomSpacing;
+          newY = _floorBase!.height - selectedRoom!.height - roomSpacing;
+        } else if (tokens.contains("right")) {
+          newX = _floorBase!.width - selectedRoom!.width - roomSpacing;
+          newY = _floorBase!.height - selectedRoom!.height - roomSpacing;
+        }
         break;
-      case "bottomleft":
-        newX = roomSpacing;
-        newY = _floorBase!.height - selectedRoom!.height - roomSpacing;
-        break;
-      case "bottomright":
-        newX = _floorBase!.width - selectedRoom!.width - roomSpacing;
-        newY = _floorBase!.height - selectedRoom!.height - roomSpacing;
-        break;
+      // case "bottomright":
+      //   break;
       case "right":
         // Find the rightmost point of all rooms except the selected one
         double rightmostPoint = 0;
@@ -738,6 +791,8 @@ class FloorPlanController extends ChangeNotifier {
       selectedRoom!.width = newWidth;
       selectedRoom!.height = newHeight;
       Fluttertoast.showToast(msg: "Room resized successfully");
+      // _saveState()();
+      notifyListeners();
     } else {
       Fluttertoast.showToast(
           msg: "Cannot resize room - would overlap with other rooms");
@@ -748,7 +803,12 @@ class FloorPlanController extends ChangeNotifier {
   void hideWalls() {
     if (selectedRoom != null) {
       selectedRoom!.hasHiddenWalls = true;
-      selectedRoom!.roomPaint.color = Colors.grey.withOpacity(0.3);
+      selectedRoom!.roomPaint = Paint()
+        ..color = Colors.grey.withOpacity(0.3)
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke;
+      // _saveState()();
+      notifyListeners();
       Fluttertoast.showToast(msg: "Walls hidden for ${selectedRoom!.name}");
     } else {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -759,7 +819,12 @@ class FloorPlanController extends ChangeNotifier {
   void showWalls() {
     if (selectedRoom != null) {
       selectedRoom!.hasHiddenWalls = false;
-      selectedRoom!.roomPaint.color = Colors.black;
+      selectedRoom!.roomPaint = Paint()
+        ..color = Colors.black
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke;
+      // _saveState()();
+      notifyListeners();
       Fluttertoast.showToast(msg: "Walls shown for ${selectedRoom!.name}");
     } else {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -798,6 +863,8 @@ class FloorPlanController extends ChangeNotifier {
       if (_stairsDoNotOverlap(
           selectedStairs!.width, selectedStairs!.length, newPosition)) {
         selectedStairs!.position = newPosition;
+        // _saveState()();
+        notifyListeners();
         Fluttertoast.showToast(msg: "Stairs moved successfully");
       } else {
         Fluttertoast.showToast(
@@ -809,38 +876,44 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  void moveStairsToPosition(String position) {
+  void moveStairsToPosition(
+      String position, List<String> tokens, BuildContext context) {
     if (selectedStairs == null || _floorBase == null) {
-      Fluttertoast.showToast(
-          msg: "Please select a stairs and ensure base exists");
+      MessageService.showMessage(
+          context, "Please select a stairs and ensure base exists",
+          type: MessageType.error);
       return;
     }
 
-    double newX, newY;
+    double newX = selectedStairs!.position.dx;
+    double newY = selectedStairs!.position.dy;
 
     switch (position.toLowerCase()) {
       case "center":
         newX = (_floorBase!.width - selectedStairs!.width) / 2;
         newY = (_floorBase!.height - selectedStairs!.length) / 2;
         break;
-      case "topleft":
-        newX = roomSpacing;
-        newY = roomSpacing;
+      case "top":
+        if (tokens.contains("left")) {
+          newX = roomSpacing;
+          newY = roomSpacing;
+        } else if (tokens.contains("right")) {
+          newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
+          newY = roomSpacing;
+        }
         break;
-      case "topright":
-        newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
-        newY = roomSpacing;
-        break;
-      case "bottomleft":
-        newX = roomSpacing;
-        newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
-        break;
-      case "bottomright":
-        newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
-        newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
+      case "bottom":
+        if (tokens.contains("left")) {
+          newX = roomSpacing;
+          newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
+        } else if (tokens.contains("right")) {
+          newX = _floorBase!.width - selectedStairs!.width - roomSpacing;
+          newY = _floorBase!.height - selectedStairs!.length - roomSpacing;
+        }
         break;
       default:
-        Fluttertoast.showToast(msg: "Invalid position specified");
+        MessageService.showMessage(context, "Invalid position specified",
+            type: MessageType.error);
         return;
     }
 
@@ -1086,6 +1159,8 @@ class FloorPlanController extends ChangeNotifier {
     // Replace old stairs with rotated one
     _stairs[stairsIndex] = rotatedStairs;
     selectStairs(rotatedStairs.name);
+    // _saveState()();
+    notifyListeners();
 
     Fluttertoast.showToast(msg: "Stairs rotated successfully");
   }
@@ -1360,6 +1435,7 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     room.doors.add(newDoor);
+    // _saveState()();
     notifyListeners();
 
     Fluttertoast.showToast(msg: "Door added successfully to ${room.name}");
@@ -1493,58 +1569,71 @@ class FloorPlanController extends ChangeNotifier {
   }
 
   // Door modification methods
-  void moveDoor(String roomName, String doorId, double newOffset) {
-    if (selectedDoor?.id != doorId) {
-      Fluttertoast.showToast(msg: "Please select the door first");
+  void moveDoor(double newOffset) {
+    if (selectedDoor == null) {
+      Fluttertoast.showToast(msg: "No door selected");
       return;
     }
-    Room? room = _findRoomByName(roomName);
-    if (room == null) return;
 
-    Door? door = room.doors.firstWhere((d) => d.id == doorId);
+    // Find the room that contains the selected door
+    Room? doorRoom = _findRoomByDoor(selectedDoor!);
+    if (doorRoom == null) {
+      Fluttertoast.showToast(msg: "Could not find room for selected door");
+      return;
+    }
 
     // Calculate wall length based on door's wall
-    double wallLength = (door.wall == "north" ||
-            door.wall == "south" ||
-            door.wall == "up" ||
-            door.wall == "down")
-        ? room.width
-        : room.height;
+    double wallLength = (selectedDoor!.wall == "north" ||
+            selectedDoor!.wall == "south" ||
+            selectedDoor!.wall == "up" ||
+            selectedDoor!.wall == "down")
+        ? doorRoom.width
+        : doorRoom.height;
 
-    // Adjust offset to respect boundaries
-    double maxOffset = wallLength - door.width - Door.minDistanceFromCorner;
-    double minOffset = Door.minDistanceFromCorner;
-    double adjustedOffset = newOffset.clamp(minOffset, maxOffset);
+    // Adjust door width for small rooms
+    double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
 
-    if (room.canAddDoor(door.wall, adjustedOffset, door.width)) {
-      door.offsetFromWallStart = adjustedOffset;
+    // Adjust minimum corner distance for small rooms
+    double minCornerDistance =
+        (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
+
+    // Calculate valid range for door placement
+    double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+    double minOffset = minCornerDistance;
+
+    if (newOffset >= minOffset && newOffset <= maxOffset) {
+      selectedDoor!.offsetFromWallStart = newOffset;
 
       // Update connected door if exists
-      if (door.connectedDoor != null) {
-        Room? connectedRoom = _findRoomByDoor(door.connectedDoor!);
+      if (selectedDoor!.connectedDoor != null) {
+        Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
         if (connectedRoom != null) {
-          double newConnectedOffset =
-              _calculateAdjacentDoorOffset(room, connectedRoom, door);
-          door.connectedDoor!.offsetFromWallStart = newConnectedOffset;
+          double newConnectedOffset = _calculateAdjacentDoorOffset(
+              doorRoom, connectedRoom, selectedDoor!);
+          selectedDoor!.connectedDoor!.offsetFromWallStart = newConnectedOffset;
         }
       }
 
+      // _saveState()();
       notifyListeners();
+      Fluttertoast.showToast(msg: "Door moved");
+    } else {
+      Fluttertoast.showToast(
+          msg:
+              "Invalid door position. Door must be at least ${minCornerDistance}ft from corners.");
     }
+  }
+
+  // Helper method to find room by door
+  Room? _findRoomByDoor(Door door) {
+    return _rooms.firstWhere((room) => room.doors.contains(door),
+        orElse: () => throw Exception("Room not found for door"));
   }
 
   Room? _findRoomByName(String name) {
     try {
       return _rooms
           .firstWhere((room) => room.name.toLowerCase() == name.toLowerCase());
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Room? _findRoomByDoor(Door door) {
-    try {
-      return _rooms.firstWhere((room) => room.doors.contains(door));
     } catch (e) {
       return null;
     }
@@ -1569,6 +1658,7 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     room.doors.clear();
+    // _saveState()();
     notifyListeners();
 
     Fluttertoast.showToast(msg: "All doors removed from ${room.name}");
@@ -1594,6 +1684,7 @@ class FloorPlanController extends ChangeNotifier {
       }
 
       room.doors.remove(door);
+      // _saveState()();
       notifyListeners();
 
       Fluttertoast.showToast(msg: "Door removed from ${room.name}");
@@ -1625,6 +1716,7 @@ class FloorPlanController extends ChangeNotifier {
             !swingInward; // Opposite swing for connected door
       }
 
+      // _saveState()();
       notifyListeners();
 
       Fluttertoast.showToast(msg: "Door swing direction updated");
@@ -1657,6 +1749,7 @@ class FloorPlanController extends ChangeNotifier {
             !openLeft; // Opposite opening direction for connected door
       }
 
+      // _saveState();
       notifyListeners();
 
       Fluttertoast.showToast(msg: "Door opening direction updated");
@@ -1671,12 +1764,10 @@ class FloorPlanController extends ChangeNotifier {
       for (Door door in selectedRoom!.doors) {
         door.isHighlighted = highlight;
       }
+      // _saveState();
       notifyListeners();
     }
   }
-
-  // Add selected door state
-  Door? selectedDoor;
 
   // Add door selection methods
   void selectDoor(String roomName, String doorId) {
@@ -1768,6 +1859,7 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     room.windows.add(newWindow);
+    // _saveState();
     notifyListeners();
     Fluttertoast.showToast(msg: "Window added successfully to ${room.name}");
   }
@@ -1852,12 +1944,14 @@ class FloorPlanController extends ChangeNotifier {
       if (window.connectedWindow != null) {
         Room? connectedRoom = _findRoomByWindow(window.connectedWindow!);
         if (connectedRoom != null) {
-          connectedRoom.windows.remove(window.connectedWindow);
+          connectedRoom.windows.remove(window.connectedWindow!);
         }
       }
 
+      // Remove the selected window
       room.windows.remove(window);
       deselectWindow();
+      // _saveState();
       notifyListeners();
       Fluttertoast.showToast(msg: "Window removed from ${room.name}");
     } catch (e) {
@@ -1865,55 +1959,67 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  void moveWindow(String roomName, String windowId, double newOffset) {
-    if (selectedWindow?.id != windowId) {
-      Fluttertoast.showToast(msg: "Please select the window first");
+  void moveWindow(double newOffset) {
+    if (selectedWindow == null) {
+      Fluttertoast.showToast(msg: "No window selected");
       return;
     }
 
-    Room? room = _findRoomByName(roomName);
-    if (room != selectedRoom) {
-      Fluttertoast.showToast(
-          msg: "Please select the room first before moving windows");
+    // Find the room that contains the selected window
+    Room? windowRoom = _findRoomByWindow(selectedWindow!);
+    if (windowRoom == null) {
+      Fluttertoast.showToast(msg: "Could not find room for selected window");
       return;
     }
 
-    try {
-      Window window = room!.windows.firstWhere((w) => w.id == windowId);
+    // Calculate wall length based on window's wall
+    double wallLength = (selectedWindow!.wall == "north" ||
+            selectedWindow!.wall == "south" ||
+            selectedWindow!.wall == "up" ||
+            selectedWindow!.wall == "down")
+        ? windowRoom.width
+        : windowRoom.height;
 
-      // Validate new position
-      if (room.canAddWindow(window.wall, newOffset, window.width)) {
-        window.offsetFromWallStart = newOffset;
+    // Adjust window width for small rooms
+    double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
 
-        // Update connected window if exists
-        if (window.connectedWindow != null) {
-          Room? connectedRoom = _findRoomByWindow(window.connectedWindow!);
-          if (connectedRoom != null) {
-            double newConnectedOffset =
-                _calculateAdjacentOffset(room, connectedRoom, window);
-            window.connectedWindow!.offsetFromWallStart = newConnectedOffset;
-          }
+    // Adjust minimum corner distance for small rooms
+    double minCornerDistance =
+        (wallLength < 6) ? 0.5 : Window.minDistanceFromCorner;
+
+    // Calculate valid range for window placement
+    double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+    double minOffset = minCornerDistance;
+
+    if (newOffset >= minOffset && newOffset <= maxOffset) {
+      selectedWindow!.offsetFromWallStart = newOffset;
+
+      // Update connected window if exists
+      if (selectedWindow!.connectedWindow != null) {
+        Room? connectedRoom =
+            _findRoomByWindow(selectedWindow!.connectedWindow!);
+        if (connectedRoom != null) {
+          double newConnectedOffset = _calculateAdjacentOffset(
+              windowRoom, connectedRoom, selectedWindow!);
+          selectedWindow!.connectedWindow!.offsetFromWallStart =
+              newConnectedOffset;
         }
-
-        notifyListeners();
-        Fluttertoast.showToast(msg: "Window moved in ${room.name}");
-      } else {
-        Fluttertoast.showToast(
-            msg:
-                "Invalid window position. Check distance from corners, doors, and other windows.");
       }
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Window not found");
+
+      // _saveState();
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Window moved");
+    } else {
+      Fluttertoast.showToast(
+          msg:
+              "Invalid window position. Window must be at least ${minCornerDistance}ft from corners.");
     }
   }
 
-  // Helper method to find room by window
+  // Helper method to find room by window (if not already defined)
   Room? _findRoomByWindow(Window window) {
-    try {
-      return _rooms.firstWhere((room) => room.windows.contains(window));
-    } catch (e) {
-      return null;
-    }
+    return _rooms.firstWhere((room) => room.windows.contains(window),
+        orElse: () => throw Exception("Room not found for window"));
   }
 
   double _calculateAdjacentOffset(
@@ -2019,5 +2125,285 @@ class FloorPlanController extends ChangeNotifier {
     selectedWindow = null;
     selectedStairs = null;
     notifyListeners();
+  }
+
+  void removeSelectedDoor() {
+    if (selectedDoor == null) {
+      Fluttertoast.showToast(msg: "No door selected");
+      return;
+    }
+
+    // Find the room that contains the selected door
+    Room? doorRoom = _findRoomByDoor(selectedDoor!);
+    if (doorRoom == null) {
+      Fluttertoast.showToast(msg: "Could not find room for selected door");
+      return;
+    }
+
+    // Remove connected door first if it exists
+    if (selectedDoor!.connectedDoor != null) {
+      Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
+      if (connectedRoom != null) {
+        connectedRoom.doors.remove(selectedDoor!.connectedDoor!);
+      }
+    }
+
+    // Remove the selected door
+    doorRoom.doors.remove(selectedDoor!);
+    selectedDoor = null;
+    notifyListeners();
+    Fluttertoast.showToast(msg: "Door removed");
+  }
+
+  void removeSelectedWindow() {
+    if (selectedWindow == null) {
+      Fluttertoast.showToast(msg: "No window selected");
+      return;
+    }
+
+    // Find the room that contains the selected window
+    Room? windowRoom = _findRoomByWindow(selectedWindow!);
+    if (windowRoom == null) {
+      Fluttertoast.showToast(msg: "Could not find room for selected window");
+      return;
+    }
+
+    // Remove connected window first if it exists
+    if (selectedWindow!.connectedWindow != null) {
+      Room? connectedRoom = _findRoomByWindow(selectedWindow!.connectedWindow!);
+      if (connectedRoom != null) {
+        connectedRoom.windows.remove(selectedWindow!.connectedWindow!);
+      }
+    }
+
+    // Remove the selected window
+    windowRoom.windows.remove(selectedWindow!);
+    selectedWindow = null;
+    notifyListeners();
+    Fluttertoast.showToast(msg: "Window removed");
+  }
+
+  // void undo() {
+  //   if (_undoStack.isEmpty) {
+  //     Fluttertoast.showToast(msg: "Nothing to undo");
+  //     return;
+  //   }
+
+  //   // Save current state to redo stack
+  //   final currentState = {
+  //     'rooms': _rooms.map((room) => room.toJson()).toList(),
+  //     'base': _floorBase?.toJson(),
+  //     'stairs': _stairs.map((stairs) => stairs.toJson()).toList(),
+  //     'roomCounter': _roomCounter,
+  //     'stairsCounter': _stairsCounter,
+  //   };
+  //   _redoStack.add(currentState);
+
+  //   // Pop and restore previous state
+  //   final previousState = _undoStack.removeLast();
+  //   _restoreState(previousState);
+
+  //   Fluttertoast.showToast(msg: "Undo successful");
+  // }
+
+  // void redo() {
+  //   if (_redoStack.isEmpty) {
+  //     Fluttertoast.showToast(msg: "Nothing to redo");
+  //     return;
+  //   }
+
+  //   // Save current state to undo stack
+  //   final currentState = {
+  //     'rooms': _rooms.map((room) => room.toJson()).toList(),
+  //     'base': _floorBase?.toJson(),
+  //     'stairs': _stairs.map((stairs) => stairs.toJson()).toList(),
+  //     'roomCounter': _roomCounter,
+  //     'stairsCounter': _stairsCounter,
+  //   };
+  //   _undoStack.add(currentState);
+
+  //   // Pop and restore next state
+  //   final nextState = _redoStack.removeLast();
+  //   _restoreState(nextState);
+
+  //   Fluttertoast.showToast(msg: "Redo successful");
+  // }
+
+  // // Helper method to save current state
+  // void _saveState() {
+  //   // Clear redo stack when a new action is performed
+  //   _redoStack.clear();
+
+  //   final currentState = {
+  //     'rooms': _rooms.map((room) => room.toJson()).toList(),
+  //     'base': _floorBase?.toJson(),
+  //     'stairs': _stairs.map((stairs) => stairs.toJson()).toList(),
+  //     'roomCounter': _roomCounter,
+  //     'stairsCounter': _stairsCounter,
+  //   };
+
+  //   _undoStack.add(currentState);
+
+  //   // Limit undo stack size
+  //   if (_undoStack.length > maxUndoSteps) {
+  //     _undoStack.removeAt(0);
+  //   }
+  // }
+
+  // // Helper method to restore state
+  // void _restoreState(Map<String, dynamic> state) {
+  //   // Clear existing state
+  //   _rooms.clear();
+  //   _stairs.clear();
+  //   _floorBase = null;
+
+  //   // Restore base
+  //   if (state['base'] != null) {
+  //     _floorBase = FloorBase.fromJson(state['base']);
+  //   }
+
+  //   // First pass: Create all rooms and their elements
+  //   final Map<String, Door> allDoors = {};
+  //   final Map<String, Window> allWindows = {};
+
+  //   if (state['rooms'] != null) {
+  //     for (var roomJson in state['rooms']) {
+  //       final room = Room.fromJson(roomJson);
+  //       // Store all doors and windows for connection restoration
+  //       for (var door in room.doors) {
+  //         allDoors[door.id] = door;
+  //       }
+  //       for (var window in room.windows) {
+  //         allWindows[window.id] = window;
+  //       }
+  //       _rooms.add(room);
+  //     }
+  //   }
+
+  //   // Second pass: Restore connections
+  //   for (var room in _rooms) {
+  //     for (var door in room.doors) {
+  //       door.restoreConnectedDoor(allDoors);
+  //     }
+  //     for (var window in room.windows) {
+  //       window.restoreConnectedWindow(allWindows);
+  //     }
+  //   }
+
+  //   // Restore stairs
+  //   if (state['stairs'] != null) {
+  //     for (var stairsJson in state['stairs']) {
+  //       _stairs.add(Stairs.fromJson(stairsJson));
+  //     }
+  //   }
+
+  //   // Restore counters
+  //   _roomCounter = state['roomCounter'] ?? 0;
+  //   _stairsCounter = state['stairsCounter'] ?? 0;
+
+  //   notifyListeners();
+  // }
+
+  // void restoreRoom(Room room, List<Door> doors, List<Window> windows) {
+  //   // Create a deep copy of the room to avoid reference issues
+  //   Room restoredRoom = Room(
+  //     room.width,
+  //     room.height,
+  //     room.position,
+  //     room.name,
+  //   );
+
+  //   // Restore doors and windows
+  //   restoredRoom.doors.addAll(doors);
+  //   restoredRoom.windows.addAll(windows);
+
+  //   // Restore other properties
+  //   restoredRoom.hasHiddenWalls = room.hasHiddenWalls;
+  //   restoredRoom.roomPaint = Paint()
+  //     ..color = room.roomPaint.color
+  //     ..strokeWidth = room.roomPaint.strokeWidth
+  //     ..style = room.roomPaint.style;
+
+  //   _rooms.add(restoredRoom);
+  //   notifyListeners();
+  // }
+
+  // // Add this method to help with debugging
+  // void printState() {
+  //   print("Current State:");
+  //   print("Base: $_floorBase");
+  //   print("Rooms: ${_rooms.length}");
+  //   print("Stairs: ${_stairs.length}");
+  //   print("Undo Stack Size: ${_undoStack.length}");
+  //   print("Redo Stack Size: ${_redoStack.length}");
+  // }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'rooms': _rooms.map((room) => room.toJson()).toList(),
+      'base': _floorBase?.toJson(),
+      'stairs': _stairs.map((stairs) => stairs.toJson()).toList(),
+      'roomCounter': _roomCounter,
+      'stairsCounter': _stairsCounter,
+    };
+  }
+
+  factory FloorPlanController.fromJson(Map<String, dynamic> json) {
+    final controller = FloorPlanController();
+
+    // Clear existing state
+    controller._rooms.clear();
+    controller._stairs.clear();
+    controller._floorBase = null;
+
+    // Restore base
+    if (json['base'] != null) {
+      controller._floorBase = FloorBase.fromJson(json['base']);
+    }
+
+    // First pass: Create all rooms and their elements
+    final Map<String, Door> allDoors = {};
+    final Map<String, Window> allWindows = {};
+
+    if (json['rooms'] != null) {
+      for (var roomJson in json['rooms']) {
+        final room = Room.fromJson(roomJson);
+        // Store all doors and windows for connection restoration
+        for (var door in room.doors) {
+          allDoors[door.id] = door;
+        }
+        for (var window in room.windows) {
+          allWindows[window.id] = window;
+        }
+        controller._rooms.add(room);
+      }
+    }
+
+    // Second pass: Restore connections
+    for (var room in controller._rooms) {
+      for (var door in room.doors) {
+        if (door.connectedDoor?.id != null) {
+          door.restoreConnectedDoor(allDoors);
+        }
+      }
+      for (var window in room.windows) {
+        if (window.connectedWindow?.id != null) {
+          window.restoreConnectedWindow(allWindows);
+        }
+      }
+    }
+
+    // Restore stairs
+    if (json['stairs'] != null) {
+      for (var stairsJson in json['stairs']) {
+        controller._stairs.add(Stairs.fromJson(stairsJson));
+      }
+    }
+
+    // Restore counters
+    controller._roomCounter = json['roomCounter'] ?? 0;
+    controller._stairsCounter = json['stairsCounter'] ?? 0;
+
+    return controller;
   }
 }

@@ -121,4 +121,39 @@ class Room {
   void clearHighlight() {
     roomPaint.color = Colors.black;
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'width': width,
+      'height': height,
+      'position': {'dx': position.dx, 'dy': position.dy},
+      'name': name,
+      'hasHiddenWalls': hasHiddenWalls,
+      'doors': doors.map((door) => door.toJson()).toList(),
+      'windows': windows.map((window) => window.toJson()).toList(),
+    };
+  }
+
+  factory Room.fromJson(Map<String, dynamic> json) {
+    final room = Room(
+      json['width'],
+      json['height'],
+      Offset(json['position']['dx'], json['position']['dy']),
+      json['name'],
+    );
+
+    room.hasHiddenWalls = json['hasHiddenWalls'];
+
+    // Restore doors
+    for (var doorJson in json['doors']) {
+      room.doors.add(Door.fromJson(doorJson));
+    }
+
+    // Restore windows
+    for (var windowJson in json['windows']) {
+      room.windows.add(Window.fromJson(windowJson));
+    }
+
+    return room;
+  }
 }

@@ -30,7 +30,6 @@ class _HomeViewState extends State<HomeView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
-    setState(() {});
   }
 
   void _onCommand(String command) {
@@ -70,7 +69,7 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableProvider<FloorManagerController>.value(
+    return ChangeNotifierProvider<FloorManagerController>.value(
       value: _floorManager,
       child: Scaffold(
         body: Column(
@@ -99,9 +98,40 @@ class _HomeViewState extends State<HomeView> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.help_outline, color: Colors.white),
-                    onPressed: () => _showCommandsDialog(context),
+                  Semantics(
+                    button: true,
+                    label: "Save",
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.save,
+                        color: Colors.white,
+                      ),
+                      tooltip: 'Save',
+                      onPressed: () => _floorManager.saveToFile(),
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: "Load",
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.file_upload,
+                        color: Colors.white,
+                      ),
+                      tooltip: 'Load Floor Plan',
+                      onPressed: () => _floorManager.loadFromFile(),
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: "Help",
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.help_outline,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => _showCommandsDialog(context),
+                    ),
                   ),
                 ],
               ),
@@ -227,14 +257,21 @@ class _HomeViewState extends State<HomeView> {
                               focusNode: _focusNode,
                             ),
                           ),
-                          IconButton(
-                            icon: Icon(
-                              _isListening ? Icons.mic_off : Icons.mic,
-                              color:
-                                  _isListening ? Colors.red : Colors.grey[600],
+                          Semantics(
+                            tooltip: "Microphone",
+                            button: true,
+                            label: _isListening ? "stop" : "listen",
+                            child: IconButton(
+                              icon: Icon(
+                                _isListening ? Icons.mic_off : Icons.mic,
+                                color: _isListening
+                                    ? Colors.red
+                                    : Colors.grey[600],
+                              ),
+                              onPressed: _isListening
+                                  ? _stopListening
+                                  : _startListening,
                             ),
-                            onPressed:
-                                _isListening ? _stopListening : _startListening,
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -279,9 +316,13 @@ class _HomeViewState extends State<HomeView> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
+          Semantics(
+            button: true,
+            label: "Close",
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close"),
+            ),
           ),
         ],
       ),
