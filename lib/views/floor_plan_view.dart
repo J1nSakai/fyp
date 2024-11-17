@@ -6,7 +6,9 @@ import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
 import 'package:saysketch_v2/models/stairs.dart';
 
+import '../models/cut_out.dart';
 import '../models/room_model.dart';
+import '../models/space.dart';
 import '../models/window.dart';
 import 'widgets/scale_indicator.dart';
 
@@ -17,6 +19,8 @@ class FloorPlanView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Stack(
       children: [
         InteractiveViewer(
@@ -33,6 +37,10 @@ class FloorPlanView extends StatelessWidget {
               controller.zoomLevel,
               controller.selectedDoor,
               controller.selectedWindow,
+              controller.getCutOuts(),
+              controller.selectedCutOut,
+              controller.selectedSpace,
+              isDarkMode,
             ),
             size: Size(
               MediaQuery.sizeOf(context).width,
@@ -44,7 +52,9 @@ class FloorPlanView extends StatelessWidget {
         Positioned(
           right: 20,
           bottom: 20,
-          child: ScaleIndicator(zoomLevel: controller.zoomLevel),
+          child: ScaleIndicator(
+            zoomLevel: controller.zoomLevel,
+          ),
         ),
       ],
     );
@@ -61,6 +71,15 @@ class FloorPlanPainter extends CustomPainter {
   final double zoomLevel;
   final Door? selectedDoor;
   final Window? selectedWindow;
+  final List<CutOut> cutOuts;
+  final CutOut? selectedCutOut;
+  final Space? selectedSpace;
+  final bool isDarkMode;
+
+  // Define theme-dependent colors
+  late final Color wallColor;
+  late final Color backgroundColor;
+  late final Color textColor;
 
   FloorPlanPainter(
       this.rooms,
@@ -70,33 +89,47 @@ class FloorPlanPainter extends CustomPainter {
       this.selectedStairs,
       this.zoomLevel,
       this.selectedDoor,
-      this.selectedWindow);
+      this.selectedWindow,
+      this.cutOuts,
+      this.selectedCutOut,
+      this.selectedSpace,
+      this.isDarkMode) {
+    // Initialize colors based on theme
+    wallColor = isDarkMode ? Colors.white70 : Colors.black;
+    backgroundColor = isDarkMode ? const Color(0xFF1A1B26) : Colors.white;
+    textColor = isDarkMode ? Colors.white70 : Colors.black;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (floorBase == null) return;
+
     final screenCenterX = size.width / 2;
     final screenCenterY = size.height / 2;
-
-    // Apply zoom to scaleFactor
     final adjustedScaleFactor = scaleFactor * zoomLevel;
 
     final basePaint = Paint()
-      ..color = Colors.black
+      ..color = wallColor
       ..strokeWidth = 6
       ..style = PaintingStyle.stroke;
 
     final baseFillPaint = Paint()
-      ..color = Colors.black12
+      ..color = backgroundColor
       ..style = PaintingStyle.fill;
 
-    const TextStyle roomTextStyle = TextStyle(
-      color: Colors.black,
+    final roomTextStyle = TextStyle(
+      color: textColor,
       fontSize: 14,
+    );
+
+    final baseTextStyle = TextStyle(
+      color: textColor,
+      fontSize: 16,
     );
 
     // Draw base if present
     if (floorBase != null) {
-      print("Drawing base: $floorBase"); // Debug print
+      // print("Drawing base: $floorBase"); // Debug print
       final baseWidthInPixels = floorBase!.width * adjustedScaleFactor;
       final baseHeightInPixels = floorBase!.height * adjustedScaleFactor;
 
@@ -130,7 +163,7 @@ class FloorPlanPainter extends CustomPainter {
         // Draw normal room walls if not hidden
         if (!room.hasHiddenWalls) {
           Paint normalPaint = Paint()
-            ..color = Colors.black
+            ..color = wallColor
             ..strokeWidth = room.roomPaint.strokeWidth
             ..style = PaintingStyle.stroke;
           canvas.drawRect(roomRect, normalPaint);
@@ -169,6 +202,26 @@ class FloorPlanPainter extends CustomPainter {
         }
       }
 
+      // Draw spaces for rooms (add before doors and windows)
+      for (Room room in rooms) {
+        final roomWidthInPixels =
+            double.parse((room.width * adjustedScaleFactor).toStringAsFixed(2));
+        final roomHeightInPixels = double.parse(
+            (room.height * adjustedScaleFactor).toStringAsFixed(2));
+
+        final roomLeft = baseLeft + (room.position.dx * adjustedScaleFactor);
+        final roomTop = baseTop + (room.position.dy * adjustedScaleFactor);
+
+        _drawSpaces(canvas, room, roomLeft, roomTop, roomWidthInPixels,
+            roomHeightInPixels, adjustedScaleFactor);
+      }
+
+      // After drawing rooms and before drawing doors, add window drawing
+      for (Room room in rooms) {
+        _drawWindowsForRoom(
+            canvas, room, baseLeft, baseTop, adjustedScaleFactor);
+      }
+
       // After drawing rooms but before drawing their dimensions, draw the doors
       if (floorBase != null) {
         for (Room room in rooms) {
@@ -178,7 +231,6 @@ class FloorPlanPainter extends CustomPainter {
       }
 
       // Draw base dimensions
-      const baseTextStyle = TextStyle(color: Colors.black, fontSize: 16);
       final baseDimensions = "${floorBase!.width}ft x ${floorBase!.height}ft";
       final baseTextSpan = TextSpan(text: baseDimensions, style: baseTextStyle);
       final baseTextPainter = TextPainter(
@@ -217,7 +269,7 @@ class FloorPlanPainter extends CustomPainter {
 
       // Draw stairs outline
       final stairPaint = Paint()
-        ..color = Colors.black
+        ..color = wallColor
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
 
@@ -225,7 +277,7 @@ class FloorPlanPainter extends CustomPainter {
 
       // Draw step lines
       final stepPaint = Paint()
-        ..color = Colors.black
+        ..color = wallColor
         ..strokeWidth = 1;
 
       switch (stair.direction) {
@@ -260,7 +312,7 @@ class FloorPlanPainter extends CustomPainter {
 
       // Draw direction arrow
       final arrowPaint = Paint()
-        ..color = Colors.black
+        ..color = isDarkMode ? Colors.white70 : Colors.black54
         ..strokeWidth = 2;
 
       final centerX = stairLeft + (stair.width * adjustedScaleFactor / 2);
@@ -353,7 +405,7 @@ class FloorPlanPainter extends CustomPainter {
       // Highlight selected stairs
       if (selectedStairs == stair) {
         final highlightPaint = Paint()
-          ..color = Colors.blue
+          ..color = isDarkMode ? Colors.lightBlueAccent : Colors.blue
           ..strokeWidth = 3
           ..style = PaintingStyle.stroke;
 
@@ -361,15 +413,87 @@ class FloorPlanPainter extends CustomPainter {
       }
     }
 
-    // After drawing rooms and before drawing doors, add window drawing
-    for (Room room in rooms) {
+    // Draw cutouts
+    for (CutOut cutOut in cutOuts) {
       final baseWidthInPixels = floorBase!.width * adjustedScaleFactor;
       final baseHeightInPixels = floorBase!.height * adjustedScaleFactor;
 
       final baseLeft = screenCenterX - (baseWidthInPixels / 2);
       final baseTop = screenCenterY - (baseHeightInPixels / 2);
 
-      _drawWindowsForRoom(canvas, room, baseLeft, baseTop, adjustedScaleFactor);
+      final cutOutWidthInPixels = cutOut.width * adjustedScaleFactor;
+      final cutOutHeightInPixels = cutOut.height * adjustedScaleFactor;
+
+      final cutOutLeft = baseLeft + (cutOut.position.dx * adjustedScaleFactor);
+      final cutOutTop = baseTop + (cutOut.position.dy * adjustedScaleFactor);
+
+      final cutOutRect = Rect.fromLTWH(
+        cutOutLeft,
+        cutOutTop,
+        cutOutWidthInPixels,
+        cutOutHeightInPixels,
+      );
+
+      // Draw cutout outline
+      final cutOutPaint = Paint()
+        ..color = cutOut == selectedCutOut
+            ? (isDarkMode ? Colors.redAccent : Colors.red)
+            : wallColor
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawRect(cutOutRect, cutOutPaint);
+
+      // Draw spaces for cutouts (add before doors and windows)
+      for (CutOut cutout in cutOuts) {
+        final cutOutWidthInPixels = cutout.width * adjustedScaleFactor;
+        final cutOutHeightInPixels = cutout.height * adjustedScaleFactor;
+
+        final cutOutLeft =
+            baseLeft + (cutout.position.dx * adjustedScaleFactor);
+        final cutOutTop = baseTop + (cutout.position.dy * adjustedScaleFactor);
+
+        _drawSpaces(canvas, cutout, cutOutLeft, cutOutTop, cutOutWidthInPixels,
+            cutOutHeightInPixels, adjustedScaleFactor);
+      }
+
+      for (CutOut cutout in cutOuts) {
+        _drawWindowsForCutout(
+            canvas, cutout, baseLeft, baseTop, adjustedScaleFactor);
+      }
+
+      if (floorBase != null) {
+        for (CutOut cutout in cutOuts) {
+          _drawDoorsForCutout(
+              canvas, cutout, baseLeft, baseTop, adjustedScaleFactor);
+        }
+      }
+      final cutOutTextStyle = TextStyle(
+        color: textColor.withOpacity(0.4),
+        fontSize: 16,
+      );
+      // Draw cutout label
+      final cutOutText =
+          "${cutOut.name}\n${cutOut.width}ft x ${cutOut.height}ft";
+      final cutOutTextSpan = TextSpan(text: cutOutText, style: cutOutTextStyle);
+      final cutOutTextPainter = TextPainter(
+        text: cutOutTextSpan,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+
+      cutOutTextPainter.layout(
+        minWidth: 0,
+        maxWidth: cutOutWidthInPixels,
+      );
+
+      cutOutTextPainter.paint(
+        canvas,
+        Offset(
+          cutOutLeft + (cutOutWidthInPixels - cutOutTextPainter.width) / 2,
+          cutOutTop + (cutOutHeightInPixels - cutOutTextPainter.height) / 2,
+        ),
+      );
     }
   }
 
@@ -378,8 +502,10 @@ class FloorPlanPainter extends CustomPainter {
     for (Door door in room.doors) {
       final doorPaint = Paint()
         ..color = door == selectedDoor
-            ? Colors.green
-            : (door.isHighlighted ? Colors.blue : Colors.black)
+            ? (isDarkMode ? Colors.greenAccent : Colors.green)
+            : (door.isHighlighted
+                ? (isDarkMode ? Colors.lightBlueAccent : Colors.blue)
+                : wallColor)
         ..strokeWidth = (door == selectedDoor || door.isHighlighted)
             ? room.roomPaint.strokeWidth - 1
             : room.roomPaint.strokeWidth - 1.5
@@ -469,7 +595,7 @@ class FloorPlanPainter extends CustomPainter {
 
       // Draw door gap (erase part of the wall)
       final gapPaint = Paint()
-        ..color = Colors.white
+        ..color = backgroundColor
         ..strokeWidth = doorPaint.strokeWidth + 1
         ..style = PaintingStyle.stroke;
       canvas.drawLine(gapStart, gapEnd, gapPaint);
@@ -541,8 +667,10 @@ class FloorPlanPainter extends CustomPainter {
     for (Window window in room.windows) {
       final windowPaint = Paint()
         ..color = window == selectedWindow
-            ? Colors.yellow
-            : (window.isHighlighted ? Colors.blue : Colors.black)
+            ? (isDarkMode ? Colors.yellowAccent : Colors.yellow)
+            : (window.isHighlighted
+                ? (isDarkMode ? Colors.lightBlueAccent : Colors.blue)
+                : wallColor)
         ..strokeWidth =
             room.roomPaint.strokeWidth * 0.25 // Match room's stroke width
         ..style = PaintingStyle.stroke;
@@ -635,7 +763,420 @@ class FloorPlanPainter extends CustomPainter {
 
       // Draw window gap (erase part of the wall)
       final gapPaint = Paint()
-        ..color = Colors.white
+        ..color = backgroundColor
+        ..strokeWidth = windowPaint.strokeWidth + 1.5
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(gapStart, gapEnd, gapPaint);
+
+      // Draw window frame
+      canvas.drawRect(windowFrame, windowPaint);
+
+      // Draw center line
+      final centerStart = Offset(
+        (gapStart.dx + gapEnd.dx) / 2,
+        (gapStart.dy + gapEnd.dy) / 2,
+      );
+      final centerOffset = window.wall == "north" ||
+              window.wall == "south" ||
+              window.wall == "up" ||
+              window.wall == "down"
+          ? Offset(0, frameThickness / 2)
+          : Offset(frameThickness / 2, 0);
+
+      canvas.drawLine(
+        centerStart - centerOffset,
+        centerStart + centerOffset,
+        windowPaint,
+      );
+
+      // Draw connecting window indicator if this is a connecting window
+      if (window.connectedWindow != null) {
+        final connectingDotPaint = Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(centerStart, 1, connectingDotPaint);
+      }
+    }
+  }
+
+  void _drawSpaces(
+    Canvas canvas,
+    dynamic parent,
+    double left,
+    double top,
+    double widthInPixels,
+    double heightInPixels,
+    double adjustedScaleFactor,
+  ) {
+    final right = left + widthInPixels;
+    final bottom = top + heightInPixels;
+
+    for (Space space in parent.spaces) {
+      final spaceLength = space.width * adjustedScaleFactor;
+      double spaceStart;
+      Offset gapStart;
+      Offset gapEnd;
+      Rect spaceFrame;
+      const frameThickness = 3.0;
+
+      final spacePaint = Paint()
+        ..color = space.isHighlighted ? Colors.red : Colors.white
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke;
+
+      switch (space.wall) {
+        case "north":
+        case "up":
+          spaceStart = left + (space.offsetFromWallStart * adjustedScaleFactor);
+          gapStart = Offset(spaceStart, top);
+          gapEnd = Offset(spaceStart + spaceLength, top);
+          spaceFrame = Rect.fromLTWH(
+            spaceStart,
+            top - frameThickness / 2,
+            spaceLength,
+            frameThickness,
+          );
+          break;
+
+        case "south":
+        case "down":
+          spaceStart = left + (space.offsetFromWallStart * adjustedScaleFactor);
+          gapStart = Offset(spaceStart, bottom);
+          gapEnd = Offset(spaceStart + spaceLength, bottom);
+          spaceFrame = Rect.fromLTWH(
+            spaceStart,
+            bottom - frameThickness / 2,
+            spaceLength,
+            frameThickness,
+          );
+          break;
+
+        case "east":
+        case "right":
+          spaceStart = top + (space.offsetFromWallStart * adjustedScaleFactor);
+          gapStart = Offset(right, spaceStart);
+          gapEnd = Offset(right, spaceStart + spaceLength);
+          spaceFrame = Rect.fromLTWH(
+            right - frameThickness / 2,
+            spaceStart,
+            frameThickness,
+            spaceLength,
+          );
+          break;
+
+        case "west":
+        case "left":
+          spaceStart = top + (space.offsetFromWallStart * adjustedScaleFactor);
+          gapStart = Offset(left, spaceStart);
+          gapEnd = Offset(left, spaceStart + spaceLength);
+          spaceFrame = Rect.fromLTWH(
+            left - frameThickness / 2,
+            spaceStart,
+            frameThickness,
+            spaceLength,
+          );
+          break;
+
+        default:
+          continue;
+      }
+
+      // Draw space gap (erase part of the wall)
+      final gapPaint = Paint()
+        ..color = backgroundColor
+        ..strokeWidth = spacePaint.strokeWidth + 1.5
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(gapStart, gapEnd, gapPaint);
+
+      // Draw space frame
+      canvas.drawRect(spaceFrame, spacePaint);
+
+      // Draw connecting space indicator if this is a connecting space
+      if (space.connectedSpace != null) {
+        final centerStart = Offset(
+          (gapStart.dx + gapEnd.dx) / 2,
+          (gapStart.dy + gapEnd.dy) / 2,
+        );
+        final connectingDotPaint = Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(centerStart, 2, connectingDotPaint);
+      }
+    }
+  }
+
+  void _drawDoorsForCutout(Canvas canvas, CutOut cutOut, double baseLeft,
+      double baseTop, double scaleFactor) {
+    for (Door door in cutOut.doors) {
+      final doorPaint = Paint()
+        ..color = door == selectedDoor
+            ? (isDarkMode ? Colors.greenAccent : Colors.green)
+            : (door.isHighlighted
+                ? (isDarkMode ? Colors.lightBlueAccent : Colors.blue)
+                : wallColor)
+        ..strokeWidth = (door == selectedDoor || door.isHighlighted)
+            ? cutOut.cutOutPaint.strokeWidth - 1
+            : cutOut.cutOutPaint.strokeWidth - 1.5
+        ..style = PaintingStyle.stroke;
+
+      // Convert room position to screen coordinates
+      final cutOutLeft = baseLeft + (cutOut.position.dx * scaleFactor);
+      final cutOutTop = baseTop + (cutOut.position.dy * scaleFactor);
+      final cutOutRight = cutOutLeft + (cutOut.width * scaleFactor);
+      final cutOutBottom = cutOutTop + (cutOut.height * scaleFactor);
+
+      // Calculate door length based on room dimensions
+      double doorLength;
+      switch (door.wall) {
+        case "north":
+        case "south":
+        case "up":
+        case "down":
+          doorLength = (cutOut.width * scaleFactor) / 3; // 1/3 of room width
+          break;
+        case "east":
+        case "west":
+        case "left":
+        case "right":
+          doorLength = (cutOut.height * scaleFactor) / 3; // 1/3 of room height
+          break;
+        default:
+          doorLength = Door.defaultWidth * scaleFactor;
+      }
+
+      // Calculate door position and dimensions
+      double doorStart;
+      Offset gapStart, gapEnd;
+      Offset doorLineStart, doorLineEnd;
+
+      switch (door.wall) {
+        case "north":
+        case "up":
+          doorStart = cutOutLeft + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(doorStart, cutOutTop);
+          gapEnd = Offset(doorStart + doorLength, cutOutTop);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              doorLineStart.dx,
+              door.swingInward
+                  ? cutOutTop + doorLength
+                  : cutOutTop - doorLength);
+          break;
+
+        case "south":
+        case "down":
+          doorStart = cutOutLeft + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(doorStart, cutOutBottom);
+          gapEnd = Offset(doorStart + doorLength, cutOutBottom);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              doorLineStart.dx,
+              door.swingInward
+                  ? cutOutBottom - doorLength
+                  : cutOutBottom + doorLength);
+          break;
+
+        case "east":
+        case "right":
+          doorStart = cutOutTop + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(cutOutRight, doorStart);
+          gapEnd = Offset(cutOutRight, doorStart + doorLength);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              door.swingInward
+                  ? cutOutRight - doorLength
+                  : cutOutRight + doorLength,
+              doorLineStart.dy);
+          break;
+
+        case "west":
+        case "left":
+          doorStart = cutOutTop + (door.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(cutOutLeft, doorStart);
+          gapEnd = Offset(cutOutLeft, doorStart + doorLength);
+          doorLineStart = door.openLeft ? gapStart : gapEnd;
+          doorLineEnd = Offset(
+              door.swingInward
+                  ? cutOutLeft + doorLength
+                  : cutOutLeft - doorLength,
+              doorLineStart.dy);
+          break;
+
+        default:
+          continue;
+      }
+
+      // Draw door gap (erase part of the wall)
+      final gapPaint = Paint()
+        ..color = backgroundColor
+        ..strokeWidth = doorPaint.strokeWidth + 1
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(gapStart, gapEnd, gapPaint);
+
+      // Draw door line
+      canvas.drawLine(doorLineStart, doorLineEnd, doorPaint);
+
+      // Create a dotted effect for the arc
+      const dashLength = 3.0;
+      const gapLength = 3.0;
+      final arcPath = Path()..moveTo(doorLineEnd.dx, doorLineEnd.dy);
+
+      // Calculate control point for the arc
+      Offset controlPoint;
+      if (door.wall == "north" ||
+          door.wall == "south" ||
+          door.wall == "up" ||
+          door.wall == "down") {
+        controlPoint =
+            Offset(door.openLeft ? gapEnd.dx : gapStart.dx, doorLineEnd.dy);
+      } else {
+        controlPoint =
+            Offset(doorLineEnd.dx, door.openLeft ? gapEnd.dy : gapStart.dy);
+      }
+
+      // Draw arc to the opposite end of the gap from where the door line starts
+      Offset arcEndPoint = door.openLeft ? gapEnd : gapStart;
+
+      // Create the quadratic bezier path
+      arcPath.quadraticBezierTo(
+        controlPoint.dx,
+        controlPoint.dy,
+        arcEndPoint.dx,
+        arcEndPoint.dy,
+      );
+
+      // Draw the path with dashes
+      final metric = arcPath.computeMetrics().first;
+      double distance = 0;
+      bool drawDash = true;
+
+      while (distance < metric.length) {
+        double nextDistance = distance + (drawDash ? dashLength : gapLength);
+        if (nextDistance > metric.length) {
+          nextDistance = metric.length;
+        }
+
+        if (drawDash) {
+          final pathSegment = metric.extractPath(distance, nextDistance);
+          canvas.drawPath(pathSegment, doorPaint);
+        }
+
+        distance = nextDistance;
+        drawDash = !drawDash;
+      }
+
+      // Draw connecting door indicator if this is a connecting door
+      if (door.connectedDoor != null) {
+        final connectingDotPaint = Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.fill;
+        canvas.drawCircle(doorLineStart, 2, connectingDotPaint);
+      }
+    }
+  }
+
+  void _drawWindowsForCutout(Canvas canvas, CutOut cutOut, double baseLeft,
+      double baseTop, double scaleFactor) {
+    for (Window window in cutOut.windows) {
+      final windowPaint = Paint()
+        ..color = window == selectedWindow
+            ? (isDarkMode ? Colors.yellowAccent : Colors.yellow)
+            : (window.isHighlighted
+                ? (isDarkMode ? Colors.lightBlueAccent : Colors.blue)
+                : wallColor)
+        ..strokeWidth =
+            cutOut.cutOutPaint.strokeWidth * 0.25 // Match room's stroke width
+        ..style = PaintingStyle.stroke;
+
+      // Convert room position to screen coordinates
+      final cutOutLeft = baseLeft + (cutOut.position.dx * scaleFactor);
+      final cutOutTop = baseTop + (cutOut.position.dy * scaleFactor);
+      final cutOutRight = cutOutLeft + (cutOut.width * scaleFactor);
+      final cutOutBottom = cutOutTop + (cutOut.height * scaleFactor);
+
+      // Calculate window length (1/3 of wall length)
+      double windowLength;
+      switch (window.wall) {
+        case "north":
+        case "south":
+        case "up":
+        case "down":
+          windowLength = (cutOut.width * scaleFactor) / 3;
+          break;
+        case "east":
+        case "west":
+        case "left":
+        case "right":
+          windowLength = (cutOut.height * scaleFactor) / 3;
+          break;
+        default:
+          windowLength = Window.defaultWidth * scaleFactor;
+      }
+
+      // Calculate window frame points
+      double windowStart;
+      Offset gapStart, gapEnd;
+      Rect windowFrame;
+      final frameThickness = cutOut.cutOutPaint.strokeWidth; // Frame thickness
+
+      switch (window.wall) {
+        case "north":
+        case "up":
+          windowStart = cutOutLeft + (window.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(windowStart, cutOutTop);
+          gapEnd = Offset(windowStart + windowLength, cutOutTop);
+          windowFrame = Rect.fromLTWH(
+              windowStart, // Align with gap start
+              cutOutTop - frameThickness / 2, // Center on wall
+              windowLength, // Match gap length
+              frameThickness);
+          break;
+
+        case "south":
+        case "down":
+          windowStart = cutOutLeft + (window.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(windowStart, cutOutBottom);
+          gapEnd = Offset(windowStart + windowLength, cutOutBottom);
+          windowFrame = Rect.fromLTWH(
+              windowStart, // Align with gap start
+              cutOutBottom - frameThickness / 2, // Center on wall
+              windowLength, // Match gap length
+              frameThickness);
+          break;
+
+        case "east":
+        case "right":
+          windowStart = cutOutTop + (window.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(cutOutRight, windowStart);
+          gapEnd = Offset(cutOutRight, windowStart + windowLength);
+          windowFrame = Rect.fromLTWH(
+              cutOutRight - frameThickness / 2, // Center on wall
+              windowStart, // Align with gap start
+              frameThickness,
+              windowLength // Match gap length
+              );
+          break;
+
+        case "west":
+        case "left":
+          windowStart = cutOutTop + (window.offsetFromWallStart * scaleFactor);
+          gapStart = Offset(cutOutLeft, windowStart);
+          gapEnd = Offset(cutOutLeft, windowStart + windowLength);
+          windowFrame = Rect.fromLTWH(
+              cutOutLeft - frameThickness / 2, // Center on wall
+              windowStart, // Align with gap start
+              frameThickness,
+              windowLength // Match gap length
+              );
+          break;
+
+        default:
+          continue;
+      }
+
+      // Draw window gap (erase part of the wall)
+      final gapPaint = Paint()
+        ..color = backgroundColor
         ..strokeWidth = windowPaint.strokeWidth + 1.5
         ..style = PaintingStyle.stroke;
       canvas.drawLine(gapStart, gapEnd, gapPaint);
@@ -672,5 +1213,7 @@ class FloorPlanPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(FloorPlanPainter oldDelegate) => true;
+  bool shouldRepaint(FloorPlanPainter oldDelegate) {
+    return true;
+  }
 }

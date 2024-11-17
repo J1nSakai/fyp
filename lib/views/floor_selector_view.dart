@@ -7,6 +7,9 @@ class FloorSelectorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+
     return Consumer<FloorManagerController>(
       builder: (context, floorManager, child) {
         final currentFloor = (floorManager.activeFloor?.level ?? 0) + 1;
@@ -17,11 +20,11 @@ class FloorSelectorView extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -34,23 +37,29 @@ class FloorSelectorView extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: theme.colorScheme.primary
+                        .withOpacity(isDarkMode ? 0.2 : 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Column(
                     children: [
-                      Text(
-                        'Floor $currentFloor of $totalFloors',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Semantics(
+                        label: 'Current floor status',
+                        value: 'Floor $currentFloor of $totalFloors',
+                        child: Text(
+                          'Floor $currentFloor of $totalFloors',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Total Floors: $totalFloors',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
                           fontSize: 12,
                         ),
                       ),
@@ -63,42 +72,64 @@ class FloorSelectorView extends StatelessWidget {
                   final floorNumber = totalFloors - index;
                   final isActive = floorNumber == currentFloor;
 
-                  return GestureDetector(
-                    onTap: () => floorManager.switchToFloor(floorNumber - 1),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 12,
-                      ),
-                      margin: const EdgeInsets.only(bottom: 4),
-                      decoration: BoxDecoration(
-                        color: isActive ? Colors.blue : Colors.grey[200],
+                  return Semantics(
+                    button: true,
+                    selected: isActive,
+                    label: 'Floor $floorNumber',
+                    hint: isActive
+                        ? 'Current floor'
+                        : 'Click to switch to floor $floorNumber',
+                    child: Tooltip(
+                      message: isActive
+                          ? 'Current floor'
+                          : 'Switch to floor $floorNumber',
+                      child: InkWell(
+                        onTap: () =>
+                            floorManager.switchToFloor(floorNumber - 1),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: isActive ? Colors.blue : Colors.grey[300]!,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Text(
-                            'Floor $floorNumber',
-                            style: TextStyle(
-                              color: isActive ? Colors.white : Colors.black87,
-                              fontWeight: isActive
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 12,
+                          ),
+                          margin: const EdgeInsets.only(bottom: 4),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: isActive
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurface
+                                      .withOpacity(0.2),
+                              width: 1,
                             ),
                           ),
-                          if (isActive)
-                            const Icon(
-                              Icons.check_circle,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                        ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              Text(
+                                'Floor $floorNumber',
+                                style: TextStyle(
+                                  color: isActive
+                                      ? Colors.white
+                                      : theme.colorScheme.onSurface,
+                                  fontWeight: isActive
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              if (isActive)
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   );

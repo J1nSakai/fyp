@@ -7,11 +7,17 @@ class ScaleIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.colorScheme.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.2),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -24,12 +30,12 @@ class ScaleIndicator extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Scale text
-          const Text(
+          Text(
             '1ft = 24px',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: theme.colorScheme.secondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -38,7 +44,10 @@ class ScaleIndicator extends StatelessWidget {
             height: 32,
             width: 120, // 5ft * 24px = 120px
             child: CustomPaint(
-              painter: RulerPainter(),
+              painter: RulerPainter(
+                primaryColor: theme.colorScheme.secondary,
+                accentColor: theme.colorScheme.tertiary,
+              ),
             ),
           ),
         ],
@@ -47,17 +56,30 @@ class ScaleIndicator extends StatelessWidget {
   }
 }
 
-// Separate painter just for the ruler
+// Separate painter for the ruler
 class RulerPainter extends CustomPainter {
+  final Color primaryColor;
+  final Color accentColor;
+
+  RulerPainter({
+    required this.primaryColor,
+    required this.accentColor,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final rulerPaint = Paint()
-      ..color = Colors.black87
+      ..color = accentColor // Using accent color for the main line
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
-    const textStyle = TextStyle(
-      color: Colors.black87,
+    final markerPaint = Paint()
+      ..color = primaryColor // Using primary color for markers
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    final textStyle = TextStyle(
+      color: primaryColor, // Using primary color for text
       fontSize: 10,
       fontWeight: FontWeight.w500,
     );
@@ -77,7 +99,7 @@ class RulerPainter extends CustomPainter {
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, 8),
-        rulerPaint,
+        markerPaint,
       );
 
       // Draw number
@@ -98,5 +120,7 @@ class RulerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant RulerPainter oldDelegate) =>
+      oldDelegate.primaryColor != primaryColor ||
+      oldDelegate.accentColor != accentColor;
 }

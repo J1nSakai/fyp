@@ -5,8 +5,6 @@ import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
 import 'package:saysketch_v2/models/room_model.dart';
 import 'package:saysketch_v2/services/message_service.dart';
 
-import '../models/door.dart';
-
 class CommandController {
   final FloorManagerController floorManagerController;
   Room? selectedRoom;
@@ -17,7 +15,6 @@ class CommandController {
       floorManagerController.getActiveController();
 
   void handleCommand(String command, BuildContext context) {
-    // Convert command to lowercase for easier comparison
     command = command.toLowerCase();
     List<String> tokens = command.split(" ");
 
@@ -82,6 +79,11 @@ class CommandController {
     }
 
     print("Recognized command: $command"); // Debug print
+
+    if (tokens.contains("select") && tokens.contains("cutout")) {
+      _handleSelectCutOutCommand(tokens);
+      return;
+    }
 
     if (tokens.contains("resize") ||
         tokens.contains("change") ||
@@ -165,10 +167,35 @@ class CommandController {
     } else if (tokens.contains("zoom")) {
       _handleZoomCommand(tokens);
       return;
-    } else {
-      Fluttertoast.showToast(msg: "Invalid Command: $command");
+    } else if ((tokens.contains("add") || tokens.contains("create")) &&
+        tokens.contains("cutout")) {
+      _handleAddCutOutCommand(command, tokens);
       return;
     }
+
+    if (tokens.contains("add") && tokens.contains("space")) {
+      _handleAddSpaceCommand(tokens);
+      return;
+    }
+
+    if (tokens.contains("select") && tokens.contains("space")) {
+      _handleSelectSpaceCommand(tokens);
+      return;
+    }
+
+    if (tokens.contains("move") && tokens.contains("space")) {
+      _handleMoveSpaceCommand(tokens);
+      return;
+    }
+
+    if ((tokens.contains("remove") || tokens.contains("delete")) &&
+        tokens.contains("space")) {
+      _handleRemoveSpaceCommand(tokens);
+      return;
+    }
+
+    Fluttertoast.showToast(msg: "Invalid Command: $command");
+    return;
   }
 
   void _handleHideCommand(List<String> tokens) {
@@ -1143,7 +1170,7 @@ class CommandController {
 
     // Handle other door commands
     if (tokens.contains("add")) {
-      _handleAddDoorCommand(command, tokens);
+      _handleAddDoorCommand(tokens);
     } else if (tokens.contains("move")) {
       _handleMoveDoorCommand(tokens);
     } else if (tokens.contains("swing")) {
@@ -1163,24 +1190,32 @@ class CommandController {
 
   // Add new method for door selection
   void _handleSelectDoorCommand(List<String> tokens) {
-    if (selectedRoom == null) {
-      MessageService.showMessage(
-        floorManagerController.context,
-        "Please select a room first",
-        type: MessageType.error,
-      );
-      return;
-    }
-
-    // Extract door number
+    String? parentName;
     int? doorNumber;
+
+    // Find door number
     for (int i = 0; i < tokens.length; i++) {
       if (tokens[i] == "door" && i + 1 < tokens.length) {
-        try {
-          doorNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
+        doorNumber = int.tryParse(tokens[i + 1]);
+        break;
+      }
+    }
+
+    // Find parent (room or cutout) name
+    if (floorPlanController?.selectedRoom != null) {
+      parentName = floorPlanController?.selectedRoom?.name;
+    } else if (floorPlanController?.selectedCutOut != null) {
+      parentName = floorPlanController?.selectedCutOut?.name;
+    } else {
+      // Look for "in room X" or "in cutout X" pattern
+      for (int i = 0; i < tokens.length - 2; i++) {
+        if (tokens[i] == "in") {
+          if (tokens[i + 1] == "room" || tokens[i + 1] == "cutout") {
+            String type = tokens[i + 1];
+            String number = tokens[i + 2];
+            parentName = "$type $number";
+            break;
+          }
         }
       }
     }
@@ -1194,90 +1229,41 @@ class CommandController {
       return;
     }
 
-    String doorId = "${selectedRoom!.name}:$doorNumber";
-    floorPlanController?.selectDoor(selectedRoom!.name, doorId);
+    if (parentName == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a room/cutout first or specify which room/cutout (e.g., 'select door 1 in room 1' or 'select door 1 in cutout 1')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    String doorId = "$parentName:d:$doorNumber";
+    floorPlanController?.selectDoor(parentName, doorId);
   }
 
-  void _handleAddDoorCommand(String command, List<String> tokens) {
-    // Extract wall
+  void _handleAddDoorCommand(List<String> tokens) {
     String? wall;
-    for (String direction in [
-      "north",
-      "up",
-      "south",
-      "down",
-      "east",
-      "right",
-      "west",
-      "left"
-    ]) {
-      if (tokens.contains(direction)) {
-        wall = direction;
+
+    // Extract wall
+    for (int i = 0; i < tokens.length - 1; i++) {
+      if (tokens[i] == "on") {
+        wall = tokens[i + 1];
         break;
       }
     }
 
     if (wall == null) {
-      MessageService.showMessage(floorManagerController.context,
-          "Please specify a wall (north, south, east, or west)",
-          type: MessageType.error);
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify which wall (e.g., 'add door on north')",
+        type: MessageType.error,
+      );
       return;
     }
 
-    // Extract offset (if specified) or calculate center position
-    double offset;
-    if (tokens.contains("at")) {
-      int atIndex = tokens.indexOf("at");
-      if (atIndex + 1 < tokens.length) {
-        try {
-          offset = double.parse(tokens[atIndex + 1]);
-        } catch (e) {
-          // If parsing fails, use center position
-          offset = _calculateDefaultDoorOffset(selectedRoom!, wall);
-        }
-      } else {
-        offset = _calculateDefaultDoorOffset(selectedRoom!, wall);
-      }
-    } else {
-      // If no offset specified, place door at center of wall
-      offset = _calculateDefaultDoorOffset(selectedRoom!, wall);
-    }
-
-    // Check for connecting door
-    bool connectToAdjacent =
-        tokens.contains("connecting") || tokens.contains("connected");
-
-    // Extract width if specified
-    double? width;
-    if (tokens.contains("width")) {
-      int widthIndex = tokens.indexOf("width");
-      if (widthIndex + 1 < tokens.length) {
-        try {
-          width = double.parse(tokens[widthIndex + 1]);
-        } catch (e) {
-          // Keep default width if parsing fails
-        }
-      }
-    }
-
-    // Add the door to the selected room
-    floorPlanController?.addDoor(
-      selectedRoom!.name,
-      wall,
-      offset,
-      width: width ?? Door.defaultWidth,
-      connectToAdjacent: connectToAdjacent,
-    );
-  }
-
-  // Add this helper method
-  double _calculateDefaultDoorOffset(Room room, String wall) {
-    double wallLength =
-        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
-            ? room.width
-            : room.height;
-    // Place door at center of wall by default
-    return (wallLength - Door.defaultWidth) / 2;
+    wall = _normalizeWallDirection(wall);
+    floorPlanController?.addDoorToSelected(wall);
   }
 
   void _handleMoveDoorCommand(List<String> tokens) {
@@ -1438,10 +1424,14 @@ class CommandController {
   }
 
   void _handleWindowCommand(String command, List<String> tokens) {
-    if (selectedRoom == null) {
+    // Check if a room or cutout is selected
+    if (floorPlanController?.selectedRoom == null &&
+        floorPlanController?.selectedCutOut == null) {
       MessageService.showMessage(
-          floorManagerController.context, "Please select a room first",
-          type: MessageType.error);
+        floorManagerController.context,
+        "Please select a room or cutout first",
+        type: MessageType.error,
+      );
       return;
     }
 
@@ -1454,70 +1444,36 @@ class CommandController {
     } else if (tokens.contains("select")) {
       _handleSelectWindowCommand(tokens);
     } else {
-      MessageService.showMessage(floorManagerController.context,
-          "Invalid window command. Available commands: add, remove, move, select",
-          type: MessageType.error);
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Invalid window command. Available commands: add, remove, move, select",
+        type: MessageType.error,
+      );
     }
   }
 
   void _handleAddWindowCommand(List<String> tokens) {
-    // Extract wall
     String? wall;
-    for (String direction in [
-      "north",
-      "up",
-      "south",
-      "down",
-      "east",
-      "right",
-      "west",
-      "left"
-    ]) {
-      if (tokens.contains(direction)) {
-        wall = direction;
+
+    // Extract wall
+    for (int i = 0; i < tokens.length - 1; i++) {
+      if (tokens[i] == "on") {
+        wall = tokens[i + 1];
         break;
       }
     }
 
     if (wall == null) {
-      MessageService.showMessage(floorManagerController.context,
-          "Please specify a wall (north, south, east, or west)",
-          type: MessageType.error);
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify which wall (e.g., 'add window on north')",
+        type: MessageType.error,
+      );
       return;
     }
 
-    // Extract offset (if specified) or calculate center position
-    double offset;
-    if (tokens.contains("at")) {
-      int atIndex = tokens.indexOf("at");
-      if (atIndex + 1 < tokens.length) {
-        try {
-          offset = double.parse(tokens[atIndex + 1]);
-        } catch (e) {
-          // If parsing fails, use center position
-          offset = (wall == "north" || wall == "south")
-              ? selectedRoom!.width / 2
-              : selectedRoom!.height / 2;
-        }
-      } else {
-        offset = (wall == "north" || wall == "south")
-            ? selectedRoom!.width / 2
-            : selectedRoom!.height / 2;
-      }
-    } else {
-      // Default to center position
-      offset = (wall == "north" || wall == "south")
-          ? selectedRoom!.width / 2
-          : selectedRoom!.height / 2;
-    }
-
-    // Check for connecting window
-    bool connectToAdjacent = tokens.contains("connecting") ||
-        tokens.contains("connected") ||
-        tokens.contains("connect");
-
-    floorPlanController?.addWindow(selectedRoom!.name, wall, offset,
-        connectToAdjacent: connectToAdjacent);
+    wall = _normalizeWallDirection(wall);
+    floorPlanController?.addWindowToSelected(wall);
   }
 
   void _handleRemoveWindowCommand(List<String> tokens) {
@@ -1590,34 +1546,229 @@ class CommandController {
   }
 
   void _handleSelectWindowCommand(List<String> tokens) {
-    if (selectedRoom == null) {
-      MessageService.showMessage(
-          floorManagerController.context, "Please select a room first",
-          type: MessageType.error);
-      return;
-    }
-
-    // Extract window number
+    String? parentName;
     int? windowNumber;
+
+    // Find window number
     for (int i = 0; i < tokens.length; i++) {
       if (tokens[i] == "window" && i + 1 < tokens.length) {
-        try {
-          windowNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
+        windowNumber = int.tryParse(tokens[i + 1]);
+        break;
+      }
+    }
+
+    // Find parent (room or cutout) name
+    if (floorPlanController?.selectedRoom != null) {
+      parentName = floorPlanController?.selectedRoom?.name;
+    } else if (floorPlanController?.selectedCutOut != null) {
+      parentName = floorPlanController?.selectedCutOut?.name;
+    } else {
+      // Look for "in room X" or "in cutout X" pattern
+      for (int i = 0; i < tokens.length - 2; i++) {
+        if (tokens[i] == "in") {
+          if (tokens[i + 1] == "room" || tokens[i + 1] == "cutout") {
+            String type = tokens[i + 1];
+            String number = tokens[i + 2];
+            parentName = "$type $number";
+            break;
+          }
         }
       }
     }
 
     if (windowNumber == null) {
-      MessageService.showMessage(floorManagerController.context,
-          "Please specify which window to select",
-          type: MessageType.error);
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify which window to select (e.g., 'select window 1')",
+        type: MessageType.error,
+      );
       return;
     }
 
-    String windowId = "${selectedRoom!.name}:w:$windowNumber";
-    floorPlanController?.selectWindow(selectedRoom!.name, windowId);
+    if (parentName == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a room/cutout first or specify which room/cutout (e.g., 'select window 1 in room 1' or 'select window 1 in cutout 1')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    String windowId = "$parentName:w:$windowNumber";
+    floorPlanController?.selectWindow(parentName, windowId);
+  }
+
+  void _handleAddCutOutCommand(String command, List<String> tokens) {
+    // Extract dimensions if provided
+    Map<String, double> dimensions = {};
+    if (tokens.contains("by") || tokens.contains("/")) {
+      dimensions = extractMeasurements(command);
+    }
+
+    // Default dimensions if not specified
+    double width = dimensions['width'] ?? 7.0; // 7 feet wide by default
+    double height = dimensions['height'] ?? 4.0; // 4 feet long by default
+
+    floorPlanController?.addCutOut(width, height);
+  }
+
+  void _handleSelectCutOutCommand(List<String> tokens) {
+    String? cutOutName;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "cutout" && i + 1 < tokens.length) {
+        cutOutName = tokens[i + 1];
+        break;
+      }
+    }
+
+    if (cutOutName == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify which cutout to select (e.g., 'select cutout 1')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    if (!cutOutName.startsWith("cutout ")) {
+      cutOutName = "cutout $cutOutName";
+    }
+
+    floorPlanController?.selectCutOut(cutOutName);
+  }
+
+  void _handleAddSpaceCommand(List<String> tokens) {
+    String? wall;
+    bool connectToAdjacent = tokens.contains("connect");
+
+    // Extract wall
+    for (int i = 0; i < tokens.length - 1; i++) {
+      if (tokens[i] == "on") {
+        wall = tokens[i + 1];
+        break;
+      }
+    }
+
+    if (wall == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify which wall (e.g., 'add space on north')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    wall = _normalizeWallDirection(wall);
+    floorPlanController?.addSpaceToSelected(wall, connectToAdjacent);
+  }
+
+  String _normalizeWallDirection(String wall) {
+    switch (wall.toLowerCase()) {
+      case "n":
+      case "north":
+      case "up":
+        return "north";
+      case "s":
+      case "south":
+      case "down":
+        return "south";
+      case "e":
+      case "east":
+      case "right":
+        return "east";
+      case "w":
+      case "west":
+      case "left":
+        return "west";
+      default:
+        return wall;
+    }
+  }
+
+  void _handleSelectSpaceCommand(List<String> tokens) {
+    int? spaceNumber;
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "space" && i + 1 < tokens.length) {
+        spaceNumber = int.tryParse(tokens[i + 1]);
+        break;
+      }
+    }
+
+    if (spaceNumber == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify which space to select (e.g., 'select space 1')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    // Check if we have a selected room or cutout
+    if (floorPlanController?.selectedRoom != null) {
+      String spaceId =
+          "${floorPlanController!.selectedRoom!.name}:s:$spaceNumber";
+      floorPlanController?.selectSpace(
+        floorPlanController!.selectedRoom!.name,
+        spaceId,
+      );
+    } else if (floorPlanController?.selectedCutOut != null) {
+      String spaceId =
+          "${floorPlanController!.selectedCutOut!.name}:s:$spaceNumber";
+      floorPlanController?.selectSpace(
+        floorPlanController!.selectedCutOut!.name,
+        spaceId,
+      );
+    } else {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a room or cutout first",
+        type: MessageType.error,
+      );
+    }
+  }
+
+  void _handleMoveSpaceCommand(List<String> tokens) {
+    double? newOffset;
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        newOffset = double.tryParse(tokens[toIndex + 1]);
+      }
+    }
+
+    if (newOffset == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify where to move the space (e.g., 'move space to 5')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    floorPlanController?.moveSpace(newOffset);
+  }
+
+  void _handleRemoveSpaceCommand(List<String> tokens) {
+    if (floorPlanController?.selectedSpace == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a space first",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    // Find parent (room or cutout) of selected space
+    if (floorPlanController?.selectedRoom != null) {
+      floorPlanController?.removeSpace(
+        floorPlanController!.selectedRoom!.name,
+        floorPlanController!.selectedSpace!.id,
+      );
+    } else if (floorPlanController?.selectedCutOut != null) {
+      floorPlanController?.removeSpace(
+        floorPlanController!.selectedCutOut!.name,
+        floorPlanController!.selectedSpace!.id,
+      );
+    }
   }
 }

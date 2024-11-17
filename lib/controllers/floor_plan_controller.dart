@@ -6,6 +6,8 @@ import 'package:saysketch_v2/models/stairs.dart';
 import 'package:saysketch_v2/services/message_service.dart';
 import '../models/room_model.dart';
 import '../models/window.dart';
+import '../models/cut_out.dart';
+import '../models/space.dart';
 
 class FloorPlanController extends ChangeNotifier {
   FloorPlanController() {
@@ -16,13 +18,18 @@ class FloorPlanController extends ChangeNotifier {
   FloorBase? _floorBase;
   final List<Room> _rooms = [];
   int _roomCounter = 0;
-  final List<Stairs> _stairs = [];
+  List<Stairs> _stairs = [];
   int _stairsCounter = 0;
+  final List<CutOut> _cutOuts = [];
+  int _cutOutCounter = 0; // Counter for cutouts
 
   Stairs? selectedStairs;
   Room? selectedRoom;
   String? selectedRoomName;
   Door? selectedDoor;
+  CutOut? selectedCutOut;
+  String? selectedCutOutName;
+  Space? selectedSpace;
 
   late Color originalColor;
 
@@ -36,8 +43,8 @@ class FloorPlanController extends ChangeNotifier {
   Window? selectedWindow;
 
   // Add these properties for state management
-  final List<Map<String, dynamic>> _undoStack = [];
-  final List<Map<String, dynamic>> _redoStack = [];
+  // final List<Map<String, dynamic>> _undoStack = [];
+  // final List<Map<String, dynamic>> _redoStack = [];
   static const int maxUndoSteps =
       20; // Limit stack size to prevent memory issues
 
@@ -56,26 +63,28 @@ class FloorPlanController extends ChangeNotifier {
     return _stairs;
   }
 
+  List<CutOut> getCutOuts() => _cutOuts;
+
   // All base building methods:
   void setDefaultBase() {
     // Save the current state before making changes
     if (_floorBase != null) {
-      // _saveState()();
+      // _saveState();
     }
 
     _floorBase = FloorBase(30.0, 20.0, const Offset(0, 0));
-    // _saveState()(); // Save the new state
+    // _saveState(); // Save the new state
     notifyListeners();
   }
 
   void setBase(double width, double height, Offset position) {
     // Save the current state before making changes
     if (_floorBase != null) {
-      // _saveState()();
+      // _saveState();
     }
 
     _floorBase = FloorBase(width, height, position);
-    // _saveState()(); // Make sure this is called
+    // _saveState(); // Make sure this is called
     notifyListeners();
     print("Base set: $_floorBase"); // Debug print
   }
@@ -101,13 +110,12 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     if (_roomFitsWithinBase(width, height, position)) {
-      if (_roomDoesNotOverlapWithOtherRooms(width, height, position)) {
+      if (_roomDoesNotOverlapWithExistingElements(width, height, position)) {
         _roomCounter++;
         _rooms.add(Room(width, height, position, "room $_roomCounter"));
-        // _saveState()();
         notifyListeners();
       } else {
-        Fluttertoast.showToast(msg: "Room overlaps with existing rooms.");
+        Fluttertoast.showToast(msg: "Room overlaps with existing elements.");
       }
     } else {
       Fluttertoast.showToast(msg: "Room must be completely inside the base.");
@@ -143,7 +151,7 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    if (_rooms.isEmpty && _stairs.isEmpty) {
+    if (_rooms.isEmpty && _stairs.isEmpty && _cutOuts.isEmpty) {
       // For the first room, position it in the top-left corner with some margin
       const defaultRoomPosition = Offset(roomSpacing, roomSpacing);
       addRoom(width, height, defaultRoomPosition);
@@ -199,7 +207,7 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     if (_roomFitsWithinBase(width, height, newPosition) &&
-        _roomDoesNotOverlapWithOtherRooms(width, height, newPosition)) {
+        _roomDoesNotOverlapWithExistingElements(width, height, newPosition)) {
       addRoom(width, height, newPosition);
     } else {
       Fluttertoast.showToast(
@@ -212,13 +220,12 @@ class FloorPlanController extends ChangeNotifier {
   Offset? _findNextRoomPosition(double roomWidth, double roomHeight) {
     if (_floorBase == null) return null;
 
-    // If this is the first element (no rooms and no stairs), start from top-left
-    if (_rooms.isEmpty && _stairs.isEmpty) {
+    // If this is the first element, start from top-left
+    if (_rooms.isEmpty && _stairs.isEmpty && _cutOuts.isEmpty) {
       Offset initialPosition = const Offset(roomSpacing, roomSpacing);
       if (_roomFitsWithinBase(roomWidth, roomHeight, initialPosition) &&
-          _roomDoesNotOverlapWithOtherRooms(
+          _roomDoesNotOverlapWithExistingElements(
               roomWidth, roomHeight, initialPosition)) {
-        print("done1");
         return initialPosition;
       }
     }
@@ -228,16 +235,34 @@ class FloorPlanController extends ChangeNotifier {
     double lastWidth = 0;
     double lastHeight = 0;
 
-    if (_rooms.isNotEmpty) {
-      Room lastRoom = _rooms.last;
-      lastPosition = lastRoom.position;
-      lastWidth = lastRoom.width;
-      lastHeight = lastRoom.height;
-    } else if (_stairs.isNotEmpty) {
-      Stairs lastStairs = _stairs.last;
-      lastPosition = lastStairs.position;
-      lastWidth = lastStairs.width;
-      lastHeight = lastStairs.length;
+    // Find the most recently added element among rooms, stairs, and cutouts
+    if (_rooms.isNotEmpty || _stairs.isNotEmpty || _cutOuts.isNotEmpty) {
+      // Get timestamps or indices for comparison
+      int lastRoomIndex = _rooms.isEmpty ? -1 : _roomCounter;
+      int lastStairsIndex = _stairs.isEmpty ? -1 : _stairsCounter;
+      int lastCutOutIndex = _cutOuts.isEmpty ? -1 : _cutOutCounter;
+
+      // Find the most recent element
+      if (lastRoomIndex >= lastStairsIndex &&
+          lastRoomIndex >= lastCutOutIndex) {
+        // Last element was a room
+        Room lastRoom = _rooms.last;
+        lastPosition = lastRoom.position;
+        lastWidth = lastRoom.width;
+        lastHeight = lastRoom.height;
+      } else if (lastStairsIndex >= lastCutOutIndex) {
+        // Last element was stairs
+        Stairs lastStairs = _stairs.last;
+        lastPosition = lastStairs.position;
+        lastWidth = lastStairs.width;
+        lastHeight = lastStairs.length;
+      } else {
+        // Last element was a cutout
+        CutOut lastCutOut = _cutOuts.last;
+        lastPosition = lastCutOut.position;
+        lastWidth = lastCutOut.width;
+        lastHeight = lastCutOut.height;
+      }
     }
 
     if (lastPosition != null) {
@@ -245,10 +270,10 @@ class FloorPlanController extends ChangeNotifier {
       List<Offset> candidatePositions = [
         // Right
         Offset(lastPosition.dx + lastWidth + roomSpacing, lastPosition.dy),
-        // Left
-        Offset(lastPosition.dx - roomWidth - roomSpacing, lastPosition.dy),
         // Below
         Offset(lastPosition.dx, lastPosition.dy + lastHeight + roomSpacing),
+        // Left
+        Offset(lastPosition.dx - roomWidth - roomSpacing, lastPosition.dy),
         // Above
         Offset(lastPosition.dx, lastPosition.dy - roomHeight - roomSpacing),
       ];
@@ -256,9 +281,8 @@ class FloorPlanController extends ChangeNotifier {
       // Try each candidate position
       for (Offset position in candidatePositions) {
         if (_roomFitsWithinBase(roomWidth, roomHeight, position) &&
-            _roomDoesNotOverlapWithOtherRooms(
+            _roomDoesNotOverlapWithExistingElements(
                 roomWidth, roomHeight, position)) {
-          print("done 2");
           return position;
         }
       }
@@ -281,7 +305,7 @@ class FloorPlanController extends ChangeNotifier {
       while (currentX + roomWidth <= _floorBase!.width) {
         Offset testPosition = Offset(currentX, currentY);
 
-        if (_roomDoesNotOverlapWithOtherRooms(
+        if (_roomDoesNotOverlapWithExistingElements(
             roomWidth, roomHeight, testPosition)) {
           return testPosition;
         }
@@ -305,52 +329,52 @@ class FloorPlanController extends ChangeNotifier {
         position.dy + roomHeight <= _floorBase!.height;
   }
 
-  bool _roomDoesNotOverlapWithOtherRooms(
-      double roomWidth, double roomHeight, Offset position) {
+  bool _roomDoesNotOverlapWithExistingElements(
+      double width, double height, Offset position) {
     // Check overlap with existing rooms
-    for (final room in _rooms) {
-      if (_checkOverlap(position, roomWidth, roomHeight, room.position,
-          room.width, room.height)) {
+    for (Room existingRoom in _rooms) {
+      if (_checkOverlap(
+        position,
+        width,
+        height,
+        existingRoom.position,
+        existingRoom.width,
+        existingRoom.height,
+      )) {
         return false;
       }
     }
 
-    // Add check for overlap with stairs
-    for (final stairs in _stairs) {
-      if (_checkOverlap(position, roomWidth, roomHeight, stairs.position,
-          stairs.width, stairs.length)) {
+    // Check overlap with cutouts
+    for (CutOut cutOut in _cutOuts) {
+      if (_checkOverlap(
+        position,
+        width,
+        height,
+        cutOut.position,
+        cutOut.width,
+        cutOut.height,
+      )) {
+        return false;
+      }
+    }
+
+    // Check overlap with stairs
+    for (Stairs stair in _stairs) {
+      if (_checkOverlap(
+        position,
+        width,
+        height,
+        stair.position,
+        stair.width,
+        stair.length,
+      )) {
         return false;
       }
     }
 
     return true;
   }
-
-  // Offset? _findPositionInGrid(double roomWidth, double roomHeight) {
-  //   if (_floorBase == null) return null;
-
-  //   double gridSpacing = roomSpacing;
-
-  //   // Start from top-left corner
-  //   for (double y = roomSpacing;
-  //       y + roomHeight <= _floorBase!.height;
-  //       y += gridSpacing) {
-  //     for (double x = roomSpacing;
-  //         x + roomWidth <= _floorBase!.width;
-  //         x += gridSpacing) {
-  //       Offset candidatePosition = Offset(x, y);
-
-  //       if (_roomFitsWithinBase(roomWidth, roomHeight, candidatePosition) &&
-  //           _roomDoesNotOverlapWithOtherRooms(
-  //               roomWidth, roomHeight, candidatePosition)) {
-  //         print("done 3");
-  //         return candidatePosition;
-  //       }
-  //     }
-  //   }
-  //   print("done 4");
-  //   return null;
-  // }
 
   // All stairs building methods:
   void addStairs(double width, double length, Offset position, String direction,
@@ -368,7 +392,7 @@ class FloorPlanController extends ChangeNotifier {
         direction: direction,
         numberOfSteps: numberOfSteps,
         name: "stairs $_stairsCounter"));
-    // _saveState()();
+    // _saveState();
     notifyListeners();
     Fluttertoast.showToast(msg: "Stairs added successfully");
   }
@@ -384,11 +408,21 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    // Find next available position for stairs
-    Offset? nextPosition = _findNextStairsPosition(width, length);
+    // Find next available position using the common method
+    Offset? nextPosition = _findNextAvailablePosition(width, length);
 
     if (nextPosition != null) {
-      addStairs(width, length, nextPosition, direction, numberOfSteps);
+      _stairsCounter++;
+      _stairs.add(Stairs(
+        width: width,
+        length: length,
+        position: nextPosition,
+        direction: direction,
+        numberOfSteps: numberOfSteps,
+        name: "stairs $_stairsCounter",
+      ));
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Stairs added successfully");
     } else {
       Fluttertoast.showToast(msg: "No suitable position found for new stairs");
     }
@@ -406,7 +440,7 @@ class FloorPlanController extends ChangeNotifier {
     if (_rooms.isNotEmpty) {
       _rooms.removeLast();
       _roomCounter--;
-      // _saveState()();
+      // _saveState();
       notifyListeners();
     }
   }
@@ -414,7 +448,7 @@ class FloorPlanController extends ChangeNotifier {
   void removeSelectedRoom() {
     _rooms.remove(selectedRoom);
     deselectRoom();
-    // _saveState()();
+    // _saveState();
     notifyListeners();
   }
 
@@ -446,6 +480,9 @@ class FloorPlanController extends ChangeNotifier {
         originalColor = room.hasHiddenWalls ? Colors.transparent : Colors.black;
         room.roomPaint.color = Colors.red;
         deselectStairs();
+        deselectDoor();
+        deselectWindow();
+        deselectSpace();
         return room;
       }
     }
@@ -461,13 +498,15 @@ class FloorPlanController extends ChangeNotifier {
     selectedRoom = null;
     selectedRoomName = null;
     deselectDoor();
+    deselectWindow();
+    deselectSpace();
     notifyListeners();
   }
 
   // Room renaming method:
   void renameRoom(String name) {
     selectedRoom!.name = name;
-    // _saveState()();
+    // _saveState();
     notifyListeners();
   }
 
@@ -478,45 +517,23 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "No base exists");
-      return;
-    }
-
     Offset newPosition = Offset(newX, newY);
 
     // Check if the new position would keep the room within base bounds
-    if (_roomFitsWithinBase(
+    if (_elementFitsWithinBase(
         selectedRoom!.width, selectedRoom!.height, newPosition)) {
-      // Create a temporary list without the selected room to check overlap
-      List<Room> otherRooms =
-          _rooms.where((room) => room != selectedRoom).toList();
-
-      bool wouldOverlap = false;
-      for (final existingRoom in otherRooms) {
-        if (_checkOverlap(
-            newPosition,
-            selectedRoom!.width,
-            selectedRoom!.height,
-            existingRoom.position,
-            existingRoom.width,
-            existingRoom.height)) {
-          wouldOverlap = true;
-          break;
-        }
-      }
-
-      if (!wouldOverlap) {
+      // Check for overlaps with all elements (excluding the selected room)
+      if (!_hasOverlapWithExistingElements(
+          selectedRoom!.width, selectedRoom!.height, newPosition,
+          excludeElement: selectedRoom)) {
         selectedRoom!.position = newPosition;
-        Fluttertoast.showToast(msg: "Room moved successfully");
-        // _saveState()();
         notifyListeners();
       } else {
         Fluttertoast.showToast(
-            msg: "Cannot move room - would overlap with other rooms");
+            msg: "Cannot move room - would overlap with other elements");
       }
     } else {
-      Fluttertoast.showToast(msg: "Cannot move room outside base boundaries");
+      Fluttertoast.showToast(msg: "Room must be completely inside the base");
     }
   }
 
@@ -626,32 +643,46 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    double newX = selectedRoom!.position.dx;
-    double newY = selectedRoom!.position.dy;
+    Offset currentPosition = selectedRoom!.position;
+    Offset newPosition;
 
     switch (direction.toLowerCase()) {
       case "right":
       case "east":
-        newX += distance;
+        newPosition = Offset(currentPosition.dx + distance, currentPosition.dy);
         break;
       case "left":
       case "west":
-        newX -= distance;
+        newPosition = Offset(currentPosition.dx - distance, currentPosition.dy);
         break;
       case "up":
       case "north":
-        newY -= distance;
+        newPosition = Offset(currentPosition.dx, currentPosition.dy - distance);
         break;
       case "down":
       case "south":
-        newY += distance;
+        newPosition = Offset(currentPosition.dx, currentPosition.dy + distance);
         break;
       default:
-        Fluttertoast.showToast(msg: "Invalid direction specified");
+        Fluttertoast.showToast(msg: "Invalid direction");
         return;
     }
 
-    moveRoom(newX, newY);
+    // Check if the new position is valid
+    if (_elementFitsWithinBase(
+        selectedRoom!.width, selectedRoom!.height, newPosition)) {
+      if (!_hasOverlapWithExistingElements(
+          selectedRoom!.width, selectedRoom!.height, newPosition,
+          excludeElement: selectedRoom)) {
+        selectedRoom!.position = newPosition;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot move room - would overlap with other elements");
+      }
+    } else {
+      Fluttertoast.showToast(msg: "Room must be completely inside the base");
+    }
   }
 
   void moveRoomRelativeToOther(int referenceRoomIndex, String direction) {
@@ -858,21 +889,20 @@ class FloorPlanController extends ChangeNotifier {
 
     Offset newPosition = Offset(newX, newY);
 
-    if (_stairsFitsWithinBase(
+    // Check if the new position would keep the stairs within base bounds
+    if (_elementFitsWithinBase(
         selectedStairs!.width, selectedStairs!.length, newPosition)) {
-      if (_stairsDoNotOverlap(
+      // Check for overlaps with all elements
+      if (!_hasOverlapWithExistingElements(
           selectedStairs!.width, selectedStairs!.length, newPosition)) {
         selectedStairs!.position = newPosition;
-        // _saveState()();
         notifyListeners();
-        Fluttertoast.showToast(msg: "Stairs moved successfully");
       } else {
         Fluttertoast.showToast(
-            msg:
-                "Cannot move stairs - would overlap with rooms or other stairs");
+            msg: "Cannot move stairs - would overlap with other elements");
       }
     } else {
-      Fluttertoast.showToast(msg: "Cannot move stairs outside base boundaries");
+      Fluttertoast.showToast(msg: "Stairs must be completely inside the base");
     }
   }
 
@@ -1293,42 +1323,28 @@ class FloorPlanController extends ChangeNotifier {
 
   bool _canRotateStairs(Stairs stairs, double newWidth, double newLength) {
     // Check if new dimensions would fit within base
-    if (!_stairsFitsWithinBase(newWidth, newLength, stairs.position)) {
+    if (!_elementFitsWithinBase(newWidth, newLength, stairs.position)) {
       return false;
     }
 
-    // Create a temporary list excluding the current stairs
-    final otherStairs = _stairs.where((s) => s.name != stairs.name).toList();
+    // Check for overlaps with existing elements (excluding the current stairs)
+    Offset position = stairs.position;
+    List<Stairs> otherStairs = _stairs.where((s) => s != stairs).toList();
 
-    // Check overlap with other stairs
-    for (final other in otherStairs) {
-      if (_checkOverlap(
-        stairs.position,
-        newWidth,
-        newLength,
-        other.position,
-        other.width,
-        other.length,
-      )) {
-        return false;
-      }
-    }
+    // Create a temporary state without the current stairs
+    List<Stairs> originalStairs = List.from(_stairs);
+    _stairs = otherStairs;
 
-    // Check overlap with rooms
-    for (final room in _rooms) {
-      if (_checkOverlap(
-        stairs.position,
-        newWidth,
-        newLength,
-        room.position,
-        room.width,
-        room.height,
-      )) {
-        return false;
-      }
-    }
+    bool hasOverlap = _hasOverlapWithExistingElements(
+      newWidth,
+      newLength,
+      position,
+    );
 
-    return true;
+    // Restore original stairs list
+    _stairs = originalStairs;
+
+    return !hasOverlap;
   }
 
   // All zoom methods:
@@ -1684,7 +1700,7 @@ class FloorPlanController extends ChangeNotifier {
       }
 
       room.doors.remove(door);
-      // _saveState()();
+      // _saveState();
       notifyListeners();
 
       Fluttertoast.showToast(msg: "Door removed from ${room.name}");
@@ -1770,28 +1786,60 @@ class FloorPlanController extends ChangeNotifier {
   }
 
   // Add door selection methods
-  void selectDoor(String roomName, String doorId) {
-    Room? room = _findRoomByName(roomName);
-    if (room == null) {
-      Fluttertoast.showToast(msg: "Room not found");
-      return;
+  void selectDoor(String parentName, String doorId) {
+    // First try to find the door in rooms
+    Room? room = _findRoomByName(parentName);
+    if (room != null) {
+      try {
+        Door door = room.doors.firstWhere((d) => d.id == doorId);
+        _selectDoorAndDeselect(door);
+        return;
+      } catch (e) {
+        // Door not found in room, continue to check cutouts
+      }
     }
 
+    // Then try to find the door in cutouts
     try {
-      Door door = room.doors.firstWhere((d) => d.id == doorId);
-      // Clear highlight of previously selected room
-      if (selectedRoom != null) {
-        selectedRoom!.clearHighlight();
-        selectedRoom = null;
-        selectedRoomName = null;
-      }
-      selectedStairs = null;
-      selectedWindow = null;
-      selectedDoor = door; // Set the selected door
-      notifyListeners();
+      CutOut cutOut = _cutOuts.firstWhere(
+        (c) => c.name == parentName,
+      );
+
+      Door door = cutOut.doors.firstWhere((d) => d.id == doorId);
+      _selectDoorAndDeselect(door);
     } catch (e) {
       Fluttertoast.showToast(msg: "Door not found");
     }
+  }
+
+  // Update the _findCutOutByDoor method to handle the case when cutout is not found
+  CutOut? _findCutOutByDoor(Door door) {
+    try {
+      return _cutOuts.firstWhere(
+        (cutOut) => cutOut.doors.contains(door),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Helper method to handle deselection and selection
+  void _selectDoorAndDeselect(Door door) {
+    // Clear highlight of previously selected room
+    if (selectedRoom != null) {
+      selectedRoom!.clearHighlight();
+      selectedRoom = null;
+      selectedRoomName = null;
+    }
+    if (selectedCutOut != null) {
+      selectedCutOut!.clearHighlight();
+      selectedCutOut = null;
+      selectedCutOutName = null;
+    }
+    selectedStairs = null;
+    selectedWindow = null;
+    selectedDoor = door;
+    notifyListeners();
   }
 
   void deselectDoor() {
@@ -1895,27 +1943,60 @@ class FloorPlanController extends ChangeNotifier {
     return connectingWindow;
   }
 
-  void selectWindow(String roomName, String windowId) {
-    Room? room = _findRoomByName(roomName);
-    if (room == null) {
-      Fluttertoast.showToast(msg: "Room not found");
-      return;
+  void selectWindow(String parentName, String windowId) {
+    // First try to find the window in rooms
+    Room? room = _findRoomByName(parentName);
+    if (room != null) {
+      try {
+        Window window = room.windows.firstWhere((w) => w.id == windowId);
+        _selectWindowAndDeselect(window);
+        return;
+      } catch (e) {
+        // Window not found in room, continue to check cutouts
+      }
     }
 
+    // Then try to find the window in cutouts
     try {
-      Window window = room.windows.firstWhere((w) => w.id == windowId);
-      // Clear highlight of previously selected room
-      if (selectedRoom != null) {
-        selectedRoom!.clearHighlight();
-        selectedRoom = null;
-        selectedRoomName = null;
-      }
-      selectedStairs = null;
-      selectedDoor = null;
-      selectedWindow = window; // Set the selected window
-      notifyListeners();
+      CutOut cutOut = _cutOuts.firstWhere(
+        (c) => c.name == parentName,
+      );
+
+      Window window = cutOut.windows.firstWhere((w) => w.id == windowId);
+      _selectWindowAndDeselect(window);
     } catch (e) {
       Fluttertoast.showToast(msg: "Window not found");
+    }
+  }
+
+  void _selectWindowAndDeselect(Window window) {
+    // Deselect everything first
+    deselectAll();
+
+    // Find the parent (room or cutout) of the window
+    Room? parentRoom = _findRoomByWindow(window);
+    CutOut? parentCutOut = _findCutOutByWindow(window);
+
+    // Select the parent and the window
+    if (parentRoom != null) {
+      selectedRoom = parentRoom;
+      selectedRoomName = parentRoom.name;
+    } else if (parentCutOut != null) {
+      selectedCutOut = parentCutOut;
+      selectedCutOutName = parentCutOut.name;
+    }
+
+    selectedWindow = window;
+    notifyListeners();
+  }
+
+  CutOut? _findCutOutByWindow(Window window) {
+    try {
+      return _cutOuts.firstWhere(
+        (cutOut) => cutOut.windows.contains(window),
+      );
+    } catch (e) {
+      return null;
     }
   }
 
@@ -2119,11 +2200,15 @@ class FloorPlanController extends ChangeNotifier {
     if (selectedRoom != null) {
       selectedRoom!.clearHighlight();
     }
-    selectedRoom = null;
-    selectedRoomName = null;
-    selectedDoor = null;
-    selectedWindow = null;
-    selectedStairs = null;
+    if (selectedCutOut != null) {
+      selectedCutOut!.clearHighlight();
+    }
+    deselectRoom();
+    deselectCutOut();
+    deselectDoor();
+    deselectWindow();
+    deselectSpace();
+    deselectStairs();
     notifyListeners();
   }
 
@@ -2133,26 +2218,27 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    // Find the room that contains the selected door
+    // Try to find the door in rooms first
     Room? doorRoom = _findRoomByDoor(selectedDoor!);
-    if (doorRoom == null) {
-      Fluttertoast.showToast(msg: "Could not find room for selected door");
+    if (doorRoom != null) {
+      doorRoom.doors.remove(selectedDoor!);
+      selectedDoor = null;
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Door removed from room");
       return;
     }
 
-    // Remove connected door first if it exists
-    if (selectedDoor!.connectedDoor != null) {
-      Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
-      if (connectedRoom != null) {
-        connectedRoom.doors.remove(selectedDoor!.connectedDoor!);
-      }
+    // If not in rooms, try cutouts
+    CutOut? doorCutOut = _findCutOutByDoor(selectedDoor!);
+    if (doorCutOut != null) {
+      doorCutOut.doors.remove(selectedDoor!);
+      selectedDoor = null;
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Door removed from cutout");
+      return;
     }
 
-    // Remove the selected door
-    doorRoom.doors.remove(selectedDoor!);
-    selectedDoor = null;
-    notifyListeners();
-    Fluttertoast.showToast(msg: "Door removed");
+    Fluttertoast.showToast(msg: "Could not find parent for selected door");
   }
 
   void removeSelectedWindow() {
@@ -2180,7 +2266,7 @@ class FloorPlanController extends ChangeNotifier {
     windowRoom.windows.remove(selectedWindow!);
     selectedWindow = null;
     notifyListeners();
-    Fluttertoast.showToast(msg: "Window removed");
+    Fluttertoast.showToast(msg: "Window removed from ${windowRoom.name}");
   }
 
   // void undo() {
@@ -2341,9 +2427,11 @@ class FloorPlanController extends ChangeNotifier {
   Map<String, dynamic> toJson() {
     return {
       'rooms': _rooms.map((room) => room.toJson()).toList(),
+      'cutOuts': _cutOuts.map((cutOut) => cutOut.toJson()).toList(),
       'base': _floorBase?.toJson(),
       'stairs': _stairs.map((stairs) => stairs.toJson()).toList(),
       'roomCounter': _roomCounter,
+      'cutOutCounter': _cutOutCounter,
       'stairsCounter': _stairsCounter,
     };
   }
@@ -2404,6 +2492,796 @@ class FloorPlanController extends ChangeNotifier {
     controller._roomCounter = json['roomCounter'] ?? 0;
     controller._stairsCounter = json['stairsCounter'] ?? 0;
 
+    // Restore cutouts
+    if (json['cutOuts'] != null) {
+      for (var cutOutJson in json['cutOuts']) {
+        controller._cutOuts.add(CutOut.fromJson(cutOutJson));
+      }
+    }
+
+    controller._cutOutCounter = json['cutOutCounter'] ?? 0;
+
     return controller;
+  }
+
+  // Add CutOut management methods
+  void addCutOut(double width, double height) {
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "Base is not set yet.");
+      return;
+    }
+
+    // Find next available position for the cutout
+    Offset? nextPosition = _findNextAvailablePosition(width, height);
+
+    if (nextPosition != null) {
+      _cutOutCounter++;
+      _cutOuts
+          .add(CutOut(width, height, nextPosition, "cutout $_cutOutCounter"));
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "No available space for cutout within base.");
+    }
+  }
+
+  Offset? _findNextAvailablePosition(double width, double height) {
+    if (_floorBase == null) return null;
+
+    // If this is the first element, start from top-left
+    if (_rooms.isEmpty && _stairs.isEmpty && _cutOuts.isEmpty) {
+      Offset initialPosition = const Offset(roomSpacing, roomSpacing);
+      if (_elementFitsWithinBase(width, height, initialPosition) &&
+          !_hasOverlapWithExistingElements(width, height, initialPosition)) {
+        return initialPosition;
+      }
+    }
+
+    // Get the last placed element's position and dimensions
+    Offset? lastPosition;
+    double lastWidth = 0;
+    double lastHeight = 0;
+
+    // Find the most recently added element among rooms, stairs, and cutouts
+    if (_rooms.isNotEmpty || _stairs.isNotEmpty || _cutOuts.isNotEmpty) {
+      // Get timestamps or indices for comparison
+      int lastRoomIndex = _rooms.isEmpty ? -1 : _roomCounter;
+      int lastStairsIndex = _stairs.isEmpty ? -1 : _stairsCounter;
+      int lastCutOutIndex = _cutOuts.isEmpty ? -1 : _cutOutCounter;
+
+      // Find the most recent element
+      if (lastRoomIndex >= lastStairsIndex &&
+          lastRoomIndex >= lastCutOutIndex) {
+        Room lastRoom = _rooms.last;
+        lastPosition = lastRoom.position;
+        lastWidth = lastRoom.width;
+        lastHeight = lastRoom.height;
+      } else if (lastStairsIndex >= lastCutOutIndex) {
+        Stairs lastStairs = _stairs.last;
+        lastPosition = lastStairs.position;
+        lastWidth = lastStairs.width;
+        lastHeight = lastStairs.length;
+      } else {
+        CutOut lastCutOut = _cutOuts.last;
+        lastPosition = lastCutOut.position;
+        lastWidth = lastCutOut.width;
+        lastHeight = lastCutOut.height;
+      }
+    }
+
+    if (lastPosition != null) {
+      // Try positions in all four directions from the last element
+      List<Offset> candidatePositions = [
+        // Right
+        Offset(lastPosition.dx + lastWidth + roomSpacing, lastPosition.dy),
+        // Below
+        Offset(lastPosition.dx, lastPosition.dy + lastHeight + roomSpacing),
+        // Left
+        Offset(lastPosition.dx - width - roomSpacing, lastPosition.dy),
+        // Above
+        Offset(lastPosition.dx, lastPosition.dy - height - roomSpacing),
+      ];
+
+      // Try each candidate position
+      for (Offset position in candidatePositions) {
+        if (_elementFitsWithinBase(width, height, position) &&
+            !_hasOverlapWithExistingElements(width, height, position)) {
+          return position;
+        }
+      }
+    }
+
+    // If no direct positions work, try a grid-based search
+    return _findAlternativePosition(width, height);
+  }
+
+  bool _elementFitsWithinBase(double width, double height, Offset position) {
+    if (_floorBase == null) return false;
+    return position.dx >= 0 &&
+        position.dy >= 0 &&
+        position.dx + width <= _floorBase!.width &&
+        position.dy + height <= _floorBase!.height;
+  }
+
+  bool _hasOverlapWithExistingElements(
+    double width,
+    double height,
+    Offset position, {
+    Object? excludeElement,
+  }) {
+    // Check overlap with rooms
+    for (Room room in _rooms) {
+      if (room != excludeElement &&
+          _checkOverlap(position, width, height, room.position, room.width,
+              room.height)) {
+        return true;
+      }
+    }
+
+    // Check overlap with stairs
+    for (Stairs stairs in _stairs) {
+      if (stairs != excludeElement &&
+          _checkOverlap(position, width, height, stairs.position, stairs.width,
+              stairs.length)) {
+        return true;
+      }
+    }
+
+    // Check overlap with cutouts
+    for (CutOut cutOut in _cutOuts) {
+      if (cutOut != excludeElement &&
+          _checkOverlap(position, width, height, cutOut.position, cutOut.width,
+              cutOut.height)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  Offset? _findAlternativePosition(double width, double height) {
+    if (_floorBase == null) return null;
+    double x = roomSpacing;
+    double y = roomSpacing;
+
+    while (y + height <= _floorBase!.height) {
+      while (x + width <= _floorBase!.width) {
+        Offset position = Offset(x, y);
+        if (!_hasOverlapWithExistingElements(width, height, position)) {
+          return position;
+        }
+        x += roomSpacing + 1;
+      }
+      x = roomSpacing;
+      y += roomSpacing + 1;
+    }
+    return null;
+  }
+
+  // CutOut selection methods
+  void selectCutOut(String cutOutName) {
+    deselectAll();
+
+    // Remove "cutout" prefix if it exists in the name parameter
+    String searchName =
+        cutOutName.startsWith("cutout ") ? cutOutName : "cutout $cutOutName";
+
+    try {
+      selectedCutOut =
+          _cutOuts.firstWhere((cutOut) => cutOut.name == searchName);
+      selectedCutOutName = searchName;
+      // Update the paint color to show selection
+      selectedCutOut!.cutOutPaint.color = Colors.red.withOpacity(0.6);
+      notifyListeners();
+    } catch (e) {
+      Fluttertoast.showToast(msg: "CutOut not found");
+    }
+  }
+
+  void deselectCutOut() {
+    if (selectedCutOut != null) {
+      selectedCutOut!.clearHighlight();
+      selectedCutOut = null;
+      selectedCutOutName = null;
+      notifyListeners();
+    }
+  }
+
+  // Helper methods
+  CutOut? _findCutOutByName(String name) {
+    try {
+      return _cutOuts.firstWhere((cutOut) => cutOut.name == name);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Space management methods
+  void addSpace(String cutOutName, String wall, double offset,
+      {bool connectToAdjacent = false}) {
+    CutOut? targetCutOut = _findCutOutByName(cutOutName);
+    if (targetCutOut == null) {
+      Fluttertoast.showToast(msg: "CutOut not found");
+      return;
+    }
+
+    if (!targetCutOut.canAddSpace(wall, offset, Space.defaultWidth)) {
+      Fluttertoast.showToast(
+          msg: "Cannot add space at this position. Check minimum distances.");
+      return;
+    }
+
+    String spaceId = targetCutOut.getNextSpaceId();
+    Space newSpace = Space(
+      id: spaceId,
+      offsetFromWallStart: offset,
+      wall: wall,
+    );
+
+    if (connectToAdjacent) {
+      _connectSpaceToAdjacent(targetCutOut, newSpace);
+    }
+
+    targetCutOut.spaces.add(newSpace);
+    notifyListeners();
+  }
+
+  void removeSpace(String cutOutName, String spaceId) {
+    if (selectedSpace?.id != spaceId) {
+      Fluttertoast.showToast(msg: "Please select the space first");
+      return;
+    }
+
+    CutOut? targetCutOut = _findCutOutByName(cutOutName);
+    if (targetCutOut == null) return;
+
+    try {
+      Space? spaceToRemove = targetCutOut.spaces.firstWhere(
+        (space) => space.id == spaceId,
+      );
+
+      // Remove connection if it exists
+      if (spaceToRemove.connectedSpace != null) {
+        spaceToRemove.connectedSpace!.connectedSpace = null;
+      }
+      targetCutOut.spaces.remove(spaceToRemove);
+      if (selectedSpace == spaceToRemove) {
+        selectedSpace = null;
+      }
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Space removed from ${targetCutOut.name}");
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Space not found");
+    }
+  }
+
+  void _connectSpaceToAdjacent(dynamic parent, Space newSpace) {
+    double tolerance = 0.5; // Half a foot tolerance for alignment
+    Offset spacePosition = _calculateSpacePosition(parent, newSpace);
+
+    // First check rooms for potential connections
+    for (Room room in _rooms) {
+      // Skip if this is the parent room
+      if (parent is Room && room == parent) continue;
+
+      if (_canConnectToRoom(room, spacePosition, newSpace.wall, tolerance)) {
+        String roomSpaceId = room.getNextSpaceId();
+        Space roomSpace = Space(
+          id: roomSpaceId,
+          offsetFromWallStart: _calculateOffsetForConnectingSpace(
+              room, spacePosition, newSpace.wall),
+          wall: _getOppositeWall(newSpace.wall),
+        );
+
+        newSpace.connectedSpace = roomSpace;
+        roomSpace.connectedSpace = newSpace;
+        room.spaces.add(roomSpace);
+        return;
+      }
+    }
+
+    // Then check cutouts
+    for (CutOut cutOut in _cutOuts) {
+      // Skip if this is the parent cutout
+      if (parent is CutOut && cutOut == parent) continue;
+
+      if (_canConnectToCutOut(
+          cutOut, spacePosition, newSpace.wall, tolerance)) {
+        String cutOutSpaceId = cutOut.getNextSpaceId();
+        Space cutOutSpace = Space(
+          id: cutOutSpaceId,
+          offsetFromWallStart: _calculateOffsetForConnectingSpace(
+              cutOut, spacePosition, newSpace.wall),
+          wall: _getOppositeWall(newSpace.wall),
+        );
+
+        newSpace.connectedSpace = cutOutSpace;
+        cutOutSpace.connectedSpace = newSpace;
+        cutOut.spaces.add(cutOutSpace);
+        return;
+      }
+    }
+  }
+
+  Offset _calculateSpacePosition(dynamic parent, Space space) {
+    double parentX = parent.position.dx;
+    double parentY = parent.position.dy;
+    double parentWidth = parent.width;
+    double parentHeight = parent.height;
+
+    switch (space.wall) {
+      case "north":
+      case "up":
+        return Offset(
+          parentX + space.offsetFromWallStart,
+          parentY,
+        );
+      case "south":
+      case "down":
+        return Offset(
+          parentX + space.offsetFromWallStart,
+          parentY + parentHeight,
+        );
+      case "east":
+      case "right":
+        return Offset(
+          parentX + parentWidth,
+          parentY + space.offsetFromWallStart,
+        );
+      case "west":
+      case "left":
+        return Offset(
+          parentX,
+          parentY + space.offsetFromWallStart,
+        );
+      default:
+        return Offset(parentX, parentY);
+    }
+  }
+
+  bool _canConnectToRoom(
+      Room room, Offset spacePosition, String spaceWall, double tolerance) {
+    switch (spaceWall) {
+      case "north":
+      case "up":
+        return _isWithinTolerance(
+                spacePosition.dy, room.position.dy + room.height, tolerance) &&
+            _isWithinHorizontalBounds(
+                spacePosition.dx, room.position.dx, room.width);
+      case "south":
+      case "down":
+        return _isWithinTolerance(
+                spacePosition.dy, room.position.dy, tolerance) &&
+            _isWithinHorizontalBounds(
+                spacePosition.dx, room.position.dx, room.width);
+      case "east":
+      case "right":
+        return _isWithinTolerance(
+                spacePosition.dx, room.position.dx, tolerance) &&
+            _isWithinVerticalBounds(
+                spacePosition.dy, room.position.dy, room.height);
+      case "west":
+      case "left":
+        return _isWithinTolerance(
+                spacePosition.dx, room.position.dx + room.width, tolerance) &&
+            _isWithinVerticalBounds(
+                spacePosition.dy, room.position.dy, room.height);
+      default:
+        return false;
+    }
+  }
+
+  bool _canConnectToCutOut(
+      CutOut cutOut, Offset spacePosition, String spaceWall, double tolerance) {
+    switch (spaceWall) {
+      case "north":
+      case "up":
+        return _isWithinTolerance(spacePosition.dy,
+                cutOut.position.dy + cutOut.height, tolerance) &&
+            _isWithinHorizontalBounds(
+                spacePosition.dx, cutOut.position.dx, cutOut.width);
+      case "south":
+      case "down":
+        return _isWithinTolerance(
+                spacePosition.dy, cutOut.position.dy, tolerance) &&
+            _isWithinHorizontalBounds(
+                spacePosition.dx, cutOut.position.dx, cutOut.width);
+      case "east":
+      case "right":
+        return _isWithinTolerance(
+                spacePosition.dx, cutOut.position.dx, tolerance) &&
+            _isWithinVerticalBounds(
+                spacePosition.dy, cutOut.position.dy, cutOut.height);
+      case "west":
+      case "left":
+        return _isWithinTolerance(spacePosition.dx,
+                cutOut.position.dx + cutOut.width, tolerance) &&
+            _isWithinVerticalBounds(
+                spacePosition.dy, cutOut.position.dy, cutOut.height);
+      default:
+        return false;
+    }
+  }
+
+  bool _isWithinTolerance(double value1, double value2, double tolerance) {
+    return (value1 - value2).abs() <= tolerance;
+  }
+
+  bool _isWithinHorizontalBounds(double x, double startX, double width) {
+    return x >= startX && x <= startX + width;
+  }
+
+  bool _isWithinVerticalBounds(double y, double startY, double height) {
+    return y >= startY && y <= startY + height;
+  }
+
+  double _calculateOffsetForConnectingSpace(
+      dynamic target, Offset spacePosition, String spaceWall) {
+    switch (spaceWall) {
+      case "north":
+      case "south":
+      case "up":
+      case "down":
+        return spacePosition.dx - target.position.dx;
+      case "east":
+      case "west":
+      case "right":
+      case "left":
+        return spacePosition.dy - target.position.dy;
+      default:
+        return 0;
+    }
+  }
+
+  // Add these methods to the FloorPlanController class
+
+  // Space Selection
+  void selectSpace(String parentName, String spaceId) {
+    deselectAll();
+
+    // Check in rooms first
+    Room? room = _findRoomByName(parentName);
+    if (room != null) {
+      try {
+        selectedSpace = room.spaces.firstWhere(
+          (space) => space.id == spaceId,
+        );
+        selectedSpace!.isHighlighted = true;
+        notifyListeners();
+        return;
+      } catch (e) {
+        // Space not found in room, continue to check cutouts
+      }
+    }
+
+    // Check in cutouts if not found in rooms
+    CutOut? cutOut = _findCutOutByName(parentName);
+    if (cutOut != null) {
+      try {
+        selectedSpace = cutOut.spaces.firstWhere(
+          (space) => space.id == spaceId,
+        );
+        selectedSpace!.isHighlighted = true;
+        notifyListeners();
+      } catch (e) {
+        // Space not found in cutout
+      }
+    }
+  }
+
+  void deselectSpace() {
+    if (selectedSpace != null) {
+      selectedSpace!.isHighlighted = false;
+      selectedSpace = null;
+      notifyListeners();
+    }
+  }
+
+  // Space Movement
+  void moveSpace(double newOffset) {
+    if (selectedSpace == null) {
+      Fluttertoast.showToast(msg: "No space selected");
+      return;
+    }
+
+    // Find parent (room or cutout) of the selected space
+    dynamic parent = _findSpaceParent(selectedSpace!);
+    if (parent == null) {
+      Fluttertoast.showToast(msg: "Could not find parent for selected space");
+      return;
+    }
+
+    // Check if new position is valid
+    if (!parent.canAddSpace(
+        selectedSpace!.wall, newOffset, selectedSpace!.width)) {
+      Fluttertoast.showToast(msg: "Cannot move space to this position");
+      return;
+    }
+
+    // Move the space
+    selectedSpace!.offsetFromWallStart = newOffset;
+
+    // If this space is connected to another space, update the connection
+    if (selectedSpace!.connectedSpace != null) {
+      _updateConnectedSpacePosition(selectedSpace!, newOffset);
+    }
+
+    notifyListeners();
+  }
+
+  // Space Removal
+
+  // Space Resizing
+  void resizeSpace(double newWidth) {
+    if (selectedSpace == null) {
+      Fluttertoast.showToast(msg: "No space selected");
+      return;
+    }
+
+    dynamic parent = _findSpaceParent(selectedSpace!);
+    if (parent == null) {
+      Fluttertoast.showToast(msg: "Could not find parent for selected space");
+      return;
+    }
+
+    // Check if new size is valid
+    if (!parent.canAddSpace(
+        selectedSpace!.wall, selectedSpace!.offsetFromWallStart, newWidth)) {
+      Fluttertoast.showToast(msg: "Cannot resize space to this width");
+      return;
+    }
+
+    // Update the width
+    selectedSpace!.width = newWidth;
+
+    // If connected, update connected space width
+    if (selectedSpace!.connectedSpace != null) {
+      selectedSpace!.connectedSpace!.width = newWidth;
+    }
+
+    notifyListeners();
+  }
+
+  // Helper methods
+  dynamic _findSpaceParent(Space space) {
+    // Check rooms first
+    for (Room room in _rooms) {
+      if (room.spaces.contains(space)) {
+        return room;
+      }
+    }
+
+    // Then check cutouts
+    for (CutOut cutOut in _cutOuts) {
+      if (cutOut.spaces.contains(space)) {
+        return cutOut;
+      }
+    }
+
+    return null;
+  }
+
+  void _removeSpaceAndConnection(List<Space> spacesList, Space spaceToRemove) {
+    // If connected, remove the connection first
+    if (spaceToRemove.connectedSpace != null) {
+      Space connectedSpace = spaceToRemove.connectedSpace!;
+      connectedSpace.connectedSpace = null;
+      spaceToRemove.connectedSpace = null;
+
+      // Find and remove the connected space from its parent
+      dynamic connectedParent = _findSpaceParent(connectedSpace);
+      if (connectedParent != null) {
+        connectedParent.spaces.remove(connectedSpace);
+      }
+    }
+
+    // Remove the space itself
+    spacesList.remove(spaceToRemove);
+    if (selectedSpace == spaceToRemove) {
+      selectedSpace = null;
+    }
+
+    notifyListeners();
+    Fluttertoast.showToast(msg: "Space removed");
+  }
+
+  void _updateConnectedSpacePosition(Space space, double newOffset) {
+    if (space.connectedSpace == null) return;
+
+    dynamic connectedParent = _findSpaceParent(space.connectedSpace!);
+    if (connectedParent == null) return;
+
+    // Calculate new offset for connected space based on the parent's dimensions
+    double connectedOffset = _calculateConnectedSpaceOffset(
+        space, space.connectedSpace!, connectedParent, newOffset);
+
+    // Update the connected space's position if valid
+    if (connectedParent.canAddSpace(space.connectedSpace!.wall, connectedOffset,
+        space.connectedSpace!.width)) {
+      space.connectedSpace!.offsetFromWallStart = connectedOffset;
+    }
+  }
+
+  double _calculateConnectedSpaceOffset(Space space, Space connectedSpace,
+      dynamic connectedParent, double newOffset) {
+    // This calculation depends on the walls that are connected
+    // For example, if connecting north to south walls
+    switch (space.wall) {
+      case "north":
+      case "south":
+        return newOffset;
+      case "east":
+      case "west":
+        return newOffset;
+      default:
+        return newOffset;
+    }
+  }
+
+  // Add this public method
+  void addSpaceToSelected(String wall, bool connectToAdjacent) {
+    if (selectedRoom != null) {
+      _addSpaceToRoom(selectedRoom!, wall, connectToAdjacent);
+    } else if (selectedCutOut != null) {
+      _addSpaceToCutOut(selectedCutOut!, wall, connectToAdjacent);
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room or cutout first");
+    }
+  }
+
+  void _addSpaceToRoom(Room room, String wall, bool connectToAdjacent) {
+    double wallLength =
+        wall == "north" || wall == "south" ? room.width : room.height;
+    double defaultWidth = wallLength / 3;
+    double centerOffset = (wallLength - defaultWidth) / 2;
+
+    if (room.canAddSpace(wall, centerOffset, defaultWidth)) {
+      String spaceId = room.getNextSpaceId();
+      Space newSpace = Space(
+        id: spaceId,
+        offsetFromWallStart: centerOffset,
+        wall: wall,
+        width: defaultWidth,
+      );
+      room.spaces.add(newSpace);
+
+      if (connectToAdjacent) {
+        _connectSpaceToAdjacent(room, newSpace);
+      }
+
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "Cannot add space at this position");
+    }
+  }
+
+  void _addSpaceToCutOut(CutOut cutOut, String wall, bool connectToAdjacent) {
+    double wallLength =
+        wall == "north" || wall == "south" ? cutOut.width : cutOut.height;
+    double defaultWidth = wallLength / 3;
+    double centerOffset = (wallLength - defaultWidth) / 2;
+
+    if (cutOut.canAddSpace(wall, centerOffset, defaultWidth)) {
+      String spaceId = cutOut.getNextSpaceId();
+      Space newSpace = Space(
+        id: spaceId,
+        offsetFromWallStart: centerOffset,
+        wall: wall,
+        width: defaultWidth,
+      );
+      cutOut.spaces.add(newSpace);
+
+      if (connectToAdjacent) {
+        _connectSpaceToAdjacent(cutOut, newSpace);
+      }
+
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "Cannot add space at this position");
+    }
+  }
+
+  // Update or add these methods
+  void addDoorToSelected(String wall) {
+    if (selectedRoom != null) {
+      _addDoorToRoom(selectedRoom!, wall);
+    } else if (selectedCutOut != null) {
+      _addDoorToCutOut(selectedCutOut!, wall);
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room or cutout first");
+    }
+  }
+
+  void addWindowToSelected(String wall) {
+    if (selectedRoom != null) {
+      _addWindowToRoom(selectedRoom!, wall);
+    } else if (selectedCutOut != null) {
+      _addWindowToCutOut(selectedCutOut!, wall);
+    } else {
+      Fluttertoast.showToast(msg: "Please select a room or cutout first");
+    }
+  }
+
+  void _addDoorToRoom(Room room, String wall) {
+    double wallLength =
+        wall == "north" || wall == "south" ? room.width : room.height;
+    double defaultWidth = wallLength / 3; // Default width is 1/3 of wall length
+    double centerOffset = (wallLength - defaultWidth) / 2; // Center the door
+
+    if (room.canAddDoor(wall, centerOffset, defaultWidth)) {
+      String doorId = room.getNextDoorId();
+      Door newDoor = Door(
+        id: doorId,
+        offsetFromWallStart: centerOffset,
+        wall: wall,
+        width: defaultWidth,
+      );
+      room.doors.add(newDoor);
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "Cannot add door at this position");
+    }
+  }
+
+  void _addDoorToCutOut(CutOut cutOut, String wall) {
+    double wallLength =
+        wall == "north" || wall == "south" ? cutOut.width : cutOut.height;
+    double defaultWidth = wallLength / 3;
+    double centerOffset = (wallLength - defaultWidth) / 2;
+
+    if (cutOut.canAddDoor(wall, centerOffset, defaultWidth)) {
+      String doorId = cutOut.getNextDoorId();
+      Door newDoor = Door(
+        id: doorId,
+        offsetFromWallStart: centerOffset,
+        wall: wall,
+        width: defaultWidth,
+      );
+      cutOut.doors.add(newDoor);
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "Cannot add door at this position");
+    }
+  }
+
+  void _addWindowToRoom(Room room, String wall) {
+    double wallLength =
+        wall == "north" || wall == "south" ? room.width : room.height;
+    double defaultWidth = wallLength / 3;
+    double centerOffset = (wallLength - defaultWidth) / 2;
+
+    if (room.canAddWindow(wall, centerOffset, defaultWidth)) {
+      String windowId = room.getNextWindowId();
+      Window newWindow = Window(
+        id: windowId,
+        offsetFromWallStart: centerOffset,
+        wall: wall,
+        width: defaultWidth,
+      );
+      room.windows.add(newWindow);
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "Cannot add window at this position");
+    }
+  }
+
+  void _addWindowToCutOut(CutOut cutOut, String wall) {
+    double wallLength =
+        wall == "north" || wall == "south" ? cutOut.width : cutOut.height;
+    double defaultWidth = wallLength / 3;
+    double centerOffset = (wallLength - defaultWidth) / 2;
+
+    if (cutOut.canAddWindow(wall, centerOffset, defaultWidth)) {
+      String windowId = cutOut.getNextWindowId();
+      Window newWindow = Window(
+        id: windowId,
+        offsetFromWallStart: centerOffset,
+        wall: wall,
+        width: defaultWidth,
+      );
+      cutOut.windows.add(newWindow);
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(msg: "Cannot add window at this position");
+    }
   }
 }

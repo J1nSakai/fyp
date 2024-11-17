@@ -8,28 +8,42 @@ class SimpleWindowInfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
-          const Icon(Icons.window, size: 16),
+          Icon(
+            Icons.window,
+            size: 16,
+            color: theme.colorScheme.onSurface,
+          ),
           const SizedBox(width: 8),
           Text(
             "Window ${window.id.split(':').last}",
-            style: const TextStyle(fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
           ),
           const Spacer(),
           Text(
             window.wall,
             style: TextStyle(
-              color: Colors.grey[600],
+              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
               fontSize: 12,
             ),
           ),
           if (window.connectedWindow != null)
             Padding(
               padding: const EdgeInsets.only(left: 8),
-              child: Icon(Icons.link, size: 14, color: Colors.blue[700]),
+              child: Icon(
+                Icons.link,
+                size: 14,
+                color: theme.colorScheme.primary,
+              ),
             ),
         ],
       ),

@@ -1,7 +1,7 @@
 - Important:
     - Implement undo/redo functionality (must be completed by tomorrow) {Ye kaam zor hai, need to ignore it for now, kyun k time nhi hai}
-    - Implement a way to save and load floor plans 
     - Add a Square entity? (This entity will help in making odd shaped rooms)
+    - Add an Introduction Screen
 
 - Fine-tuning:
     - Add a way to resize doors and windows

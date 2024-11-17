@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/window.dart';
+import 'package:saysketch_v2/models/space.dart';
 
 class Room {
   double width;
@@ -10,9 +11,11 @@ class Room {
   Paint roomPaint;
   bool hasHiddenWalls = false;
   final List<Door> doors = [];
-  int _doorCounter = 0;
   final List<Window> windows = [];
+  final List<Space> spaces = [];
+  int _doorCounter = 0;
   int _windowCounter = 0;
+  int _spaceCounter = 0;
 
   Room(
     this.width,
@@ -21,6 +24,7 @@ class Room {
     this.name, {
     List<Door>? doors,
     List<Window>? windows,
+    List<Space>? spaces,
   }) : roomPaint = Paint()
           ..color = Colors.black
           ..strokeWidth = 3
@@ -29,6 +33,58 @@ class Room {
   String getNextDoorId() {
     _doorCounter++;
     return "$name:$_doorCounter";
+  }
+
+  String getNextWindowId() {
+    _windowCounter++;
+    return "$name:w:$_windowCounter";
+  }
+
+  String getNextSpaceId() {
+    _spaceCounter++;
+    return "$name:s:$_spaceCounter";
+  }
+
+  bool canAddSpace(String wall, double offset, double width) {
+    double wallLength =
+        (wall == "north" || wall == "south") ? this.width : height;
+
+    if (offset < Space.minDistanceFromCorner ||
+        offset + width > wallLength - Space.minDistanceFromCorner) {
+      return false;
+    }
+
+    // Check overlap with existing spaces
+    for (Space existingSpace in spaces) {
+      if (existingSpace.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingSpace.offsetFromWallStart,
+            existingSpace.width, Space.minDistanceBetweenSpaces)) {
+          return false;
+        }
+      }
+    }
+
+    // Check overlap with doors
+    for (Door door in doors) {
+      if (door.wall == wall) {
+        if (_doElementsOverlap(offset, width, door.offsetFromWallStart,
+            door.width, Space.minDistanceFromDoors)) {
+          return false;
+        }
+      }
+    }
+
+    // Check overlap with windows
+    for (Window window in windows) {
+      if (window.wall == wall) {
+        if (_doElementsOverlap(offset, width, window.offsetFromWallStart,
+            window.width, Space.minDistanceFromWindows)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   bool canAddDoor(String wall, double offset, double width) {
@@ -63,12 +119,16 @@ class Room {
       }
     }
 
-    return true;
-  }
+    for (Space existingSpace in spaces) {
+      if (existingSpace.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingSpace.offsetFromWallStart,
+            existingSpace.width, Space.minDistanceFromDoors)) {
+          return false;
+        }
+      }
+    }
 
-  String getNextWindowId() {
-    _windowCounter++;
-    return "$name:w:$_windowCounter";
+    return true;
   }
 
   bool canAddWindow(String wall, double offset, double width) {
@@ -104,6 +164,15 @@ class Room {
       }
     }
 
+    for (Space existingSpace in spaces) {
+      if (existingSpace.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingSpace.offsetFromWallStart,
+            existingSpace.width, Space.minDistanceFromWindows)) {
+          return false;
+        }
+      }
+    }
+
     return true;
   }
 
@@ -131,6 +200,7 @@ class Room {
       'hasHiddenWalls': hasHiddenWalls,
       'doors': doors.map((door) => door.toJson()).toList(),
       'windows': windows.map((window) => window.toJson()).toList(),
+      'spaces': spaces.map((space) => space.toJson()).toList(),
     };
   }
 
@@ -152,6 +222,13 @@ class Room {
     // Restore windows
     for (var windowJson in json['windows']) {
       room.windows.add(Window.fromJson(windowJson));
+    }
+
+    // Restore spaces
+    if (json['spaces'] != null) {
+      for (var spaceJson in json['spaces']) {
+        room.spaces.add(Space.fromJson(spaceJson));
+      }
     }
 
     return room;
