@@ -183,7 +183,9 @@ class FloorPlanPainter extends CustomPainter {
         );
 
         roomTextPainter.layout(
-            minWidth: 0, maxWidth: room.width * adjustedScaleFactor);
+          minWidth: 0,
+          maxWidth: room.width * adjustedScaleFactor,
+        );
         roomTextPainter.paint(
           canvas,
           Offset(
@@ -402,7 +404,54 @@ class FloorPlanPainter extends CustomPainter {
           break;
       }
 
-      // Highlight selected stairs
+      // Add stair number label
+      final stairTextStyle = TextStyle(
+        color: textColor,
+        fontSize: 14 * zoomLevel,
+        fontWeight: FontWeight.w500,
+      );
+
+      final stairText = "Stairs ${stair.name.substring(stair.name.length - 1)}";
+      final stairTextSpan = TextSpan(
+        text: stairText,
+        style: stairTextStyle,
+      );
+
+      final stairTextPainter = TextPainter(
+        text: stairTextSpan,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+
+      stairTextPainter.layout();
+
+      // Position the text in the center of the stairs
+      final textX = stairLeft +
+          (stair.width * adjustedScaleFactor - stairTextPainter.width) / 2;
+      final textY = stairTop +
+          (stair.length * adjustedScaleFactor - stairTextPainter.height) / 2;
+
+      // Draw a background for better readability
+      final textBackground = Paint()
+        ..color = backgroundColor.withOpacity(0.8)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawRect(
+        Rect.fromLTWH(
+          textX - 4,
+          textY - 2,
+          stairTextPainter.width + 8,
+          stairTextPainter.height + 4,
+        ),
+        textBackground,
+      );
+
+      stairTextPainter.paint(
+        canvas,
+        Offset(textX, textY),
+      );
+
+      // Continue with existing highlight code
       if (selectedStairs == stair) {
         final highlightPaint = Paint()
           ..color = isDarkMode ? Colors.lightBlueAccent : Colors.blue

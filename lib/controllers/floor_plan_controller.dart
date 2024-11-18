@@ -483,6 +483,7 @@ class FloorPlanController extends ChangeNotifier {
         deselectDoor();
         deselectWindow();
         deselectSpace();
+        deselectCutOut();
         return room;
       }
     }
@@ -534,6 +535,32 @@ class FloorPlanController extends ChangeNotifier {
       }
     } else {
       Fluttertoast.showToast(msg: "Room must be completely inside the base");
+    }
+  }
+
+  void moveCutout(double newX, double newY) {
+    if (selectedCutOut == null) {
+      Fluttertoast.showToast(msg: "Please select a cutout first");
+      return;
+    }
+
+    Offset newPosition = Offset(newX, newY);
+
+    // Check if the new position would keep the room within base bounds
+    if (_elementFitsWithinBase(
+        selectedCutOut!.width, selectedCutOut!.height, newPosition)) {
+      // Check for overlaps with all elements (excluding the selected room)
+      if (!_hasOverlapWithExistingElements(
+          selectedCutOut!.width, selectedCutOut!.height, newPosition,
+          excludeElement: selectedCutOut)) {
+        selectedCutOut!.position = newPosition;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot move cutout - would overlap with other elements");
+      }
+    } else {
+      Fluttertoast.showToast(msg: "Cutout must be completely inside the base");
     }
   }
 
@@ -637,6 +664,106 @@ class FloorPlanController extends ChangeNotifier {
         type: MessageType.success);
   }
 
+  void moveCutoutToPosition(
+      String position, List<String> tokens, BuildContext context) {
+    if (selectedCutOut == null || _floorBase == null) {
+      Fluttertoast.showToast(
+          msg: "Please select a cutout and ensure base exists");
+      return;
+    }
+
+    double newX = selectedCutOut!.position.dx;
+    double newY = selectedCutOut!.position.dy;
+
+    switch (position.toLowerCase()) {
+      case "center":
+        newX = (_floorBase!.width - selectedCutOut!.width) / 2;
+        newY = (_floorBase!.height - selectedCutOut!.height) / 2;
+        break;
+      case "top":
+        if (tokens.contains("left")) {
+          newX = roomSpacing;
+          newY = roomSpacing;
+        } else if (tokens.contains("right")) {
+          newX = _floorBase!.width - selectedCutOut!.width - roomSpacing;
+          newY = roomSpacing;
+        }
+        break;
+      // case "topright":
+      //   break;
+      case "bottom":
+        if (tokens.contains("left")) {
+          newX = roomSpacing;
+          newY = _floorBase!.height - selectedCutOut!.height - roomSpacing;
+        } else if (tokens.contains("right")) {
+          newX = _floorBase!.width - selectedCutOut!.width - roomSpacing;
+          newY = _floorBase!.height - selectedCutOut!.height - roomSpacing;
+        }
+        break;
+      // case "bottomright":
+      //   break;
+      case "right":
+        // Find the rightmost point of all cutouts except the selected one
+        double rightmostPoint = 0;
+        for (CutOut cutout in _cutOuts) {
+          if (cutout != selectedCutOut) {
+            double cutoutRightEdge = cutout.position.dx + cutout.width;
+            if (cutoutRightEdge > rightmostPoint) {
+              rightmostPoint = cutoutRightEdge;
+            }
+          }
+        }
+        newX = rightmostPoint;
+        break;
+      case "left":
+        // Find the leftmost point of all cutouts except the selected one
+        double leftmostPoint = double.infinity;
+        for (CutOut cutout in _cutOuts) {
+          if (cutout != selectedCutOut) {
+            if (cutout.position.dx < leftmostPoint) {
+              leftmostPoint = cutout.position.dx;
+            }
+          }
+        }
+        newX = leftmostPoint - selectedCutOut!.width;
+        break;
+      case "up":
+        // Find the topmost point of all cutouts except the selected one
+        double topmostPoint = double.infinity;
+        for (CutOut cutout in _cutOuts) {
+          if (cutout != selectedCutOut) {
+            if (cutout.position.dy < topmostPoint) {
+              topmostPoint = cutout.position.dy;
+            }
+          }
+        }
+        newY = topmostPoint - selectedCutOut!.height;
+        break;
+      case "down":
+        // Find the bottommost point of all cutouts except the selected one
+        double bottommostPoint = 0;
+        for (CutOut cutout in _cutOuts) {
+          if (cutout != selectedCutOut) {
+            double cutoutBottomEdge = cutout.position.dy + cutout.height;
+            if (cutoutBottomEdge > bottommostPoint) {
+              bottommostPoint = cutoutBottomEdge;
+            }
+          }
+        }
+        newY = bottommostPoint;
+        break;
+      default:
+        MessageService.showMessage(context, "Invalid position specified",
+            type: MessageType.error);
+        return;
+    }
+
+    moveCutout(newX, newY);
+    MessageService.showMessage(
+        context, "Moved ${selectedCutOut!.name} to $position",
+        type: MessageType.success);
+  }
+
   void moveRoomRelative(double distance, String direction) {
     if (selectedRoom == null) {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -685,6 +812,40 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
+  void moveCutoutRelative(double distance, String direction) {
+    print("moveCutoutRelative");
+    if (selectedCutOut == null) {
+      Fluttertoast.showToast(msg: "Please select a cutout first");
+      return;
+    }
+
+    Offset currentPosition = selectedCutOut!.position;
+    Offset newPosition;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newPosition = Offset(currentPosition.dx + distance, currentPosition.dy);
+        break;
+      case "left":
+      case "west":
+        newPosition = Offset(currentPosition.dx - distance, currentPosition.dy);
+        break;
+      case "up":
+      case "north":
+        newPosition = Offset(currentPosition.dx, currentPosition.dy - distance);
+        break;
+      case "down":
+      case "south":
+        newPosition = Offset(currentPosition.dx, currentPosition.dy + distance);
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction");
+        return;
+    }
+    moveCutout(newPosition.dx, newPosition.dy);
+  }
+
   void moveRoomRelativeToOther(int referenceRoomIndex, String direction) {
     if (selectedRoom == null) {
       Fluttertoast.showToast(msg: "Please select a room first");
@@ -727,6 +888,144 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     moveRoom(newX, newY);
+  }
+
+  void moveRoomRelativeToCutout(int referenceCutoutIndex, String direction) {
+    if (selectedRoom == null) {
+      Fluttertoast.showToast(msg: "Please select a room first");
+      return;
+    }
+
+    if (referenceCutoutIndex < 0 || referenceCutoutIndex >= _cutOuts.length) {
+      Fluttertoast.showToast(msg: "Invalid cutout reference");
+      return;
+    }
+
+    CutOut referenceCutout = _cutOuts[referenceCutoutIndex];
+    double newX = selectedRoom!.position.dx;
+    double newY = selectedRoom!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX =
+            referenceCutout.position.dx + referenceCutout.width + roomSpacing;
+        newY = referenceCutout.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX = referenceCutout.position.dx - selectedRoom!.width - roomSpacing;
+        newY = referenceCutout.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceCutout.position.dx;
+        newY = referenceCutout.position.dy - selectedRoom!.height - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceCutout.position.dx;
+        newY =
+            referenceCutout.position.dy + referenceCutout.height + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveRoom(newX, newY);
+  }
+
+  void moveCutoutRelativeToRoom(int referenceRoomIndex, String direction) {
+    if (selectedCutOut == null) {
+      Fluttertoast.showToast(msg: "Please select a cutout first");
+      return;
+    }
+
+    if (referenceRoomIndex < 0 || referenceRoomIndex >= _rooms.length) {
+      Fluttertoast.showToast(msg: "Invalid room reference");
+      return;
+    }
+
+    Room referenceRoom = _rooms[referenceRoomIndex];
+    double newX = selectedCutOut!.position.dx;
+    double newY = selectedCutOut!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX = referenceRoom.position.dx + referenceRoom.width + roomSpacing;
+        newY = referenceRoom.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX = referenceRoom.position.dx - selectedCutOut!.width - roomSpacing;
+        newY = referenceRoom.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceRoom.position.dx;
+        newY = referenceRoom.position.dy - selectedCutOut!.height - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceRoom.position.dx;
+        newY = referenceRoom.position.dy + referenceRoom.height + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveCutout(newX, newY);
+  }
+
+  void moveCutoutRelativeToOther(int referenceCutoutIndex, String direction) {
+    if (selectedCutOut == null) {
+      Fluttertoast.showToast(msg: "Please select a cutout first");
+      return;
+    }
+
+    if (referenceCutoutIndex < 0 || referenceCutoutIndex >= _cutOuts.length) {
+      Fluttertoast.showToast(msg: "Invalid cutout reference");
+      return;
+    }
+
+    CutOut referenceCutout = _cutOuts[referenceCutoutIndex];
+    double newX = selectedCutOut!.position.dx;
+    double newY = selectedCutOut!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX =
+            referenceCutout.position.dx + referenceCutout.width + roomSpacing;
+        newY = referenceCutout.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX =
+            referenceCutout.position.dx - selectedCutOut!.width - roomSpacing;
+        newY = referenceCutout.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceCutout.position.dx;
+        newY =
+            referenceCutout.position.dy - selectedCutOut!.height - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceCutout.position.dx;
+        newY =
+            referenceCutout.position.dy + referenceCutout.height + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveCutout(newX, newY);
   }
 
   void moveRoomRelativeToStairs(int referenceStairsIndex, String direction) {
@@ -773,6 +1072,54 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     moveRoom(newX, newY);
+  }
+
+  void moveCutoutRelativeToStairs(int referenceStairsIndex, String direction) {
+    if (selectedCutOut == null) {
+      Fluttertoast.showToast(msg: "Please select a cutout first");
+      return;
+    }
+
+    if (referenceStairsIndex < 0 || referenceStairsIndex >= _stairs.length) {
+      Fluttertoast.showToast(msg: "Invalid stairs reference");
+      return;
+    }
+
+    Stairs referenceStairs = _stairs[referenceStairsIndex];
+    double newX = selectedCutOut!.position.dx;
+    double newY = selectedCutOut!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX =
+            referenceStairs.position.dx + referenceStairs.width + roomSpacing;
+        newY = referenceStairs.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX =
+            referenceStairs.position.dx - selectedCutOut!.width - roomSpacing;
+        newY = referenceStairs.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceStairs.position.dx;
+        newY =
+            referenceStairs.position.dy - selectedCutOut!.height - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceStairs.position.dx;
+        newY =
+            referenceStairs.position.dy + referenceStairs.length + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveCutout(newX, newY);
   }
 
   // Room resizing method:
@@ -822,11 +1169,70 @@ class FloorPlanController extends ChangeNotifier {
       selectedRoom!.width = newWidth;
       selectedRoom!.height = newHeight;
       Fluttertoast.showToast(msg: "Room resized successfully");
-      // _saveState()();
+      // _saveState();
       notifyListeners();
     } else {
       Fluttertoast.showToast(
           msg: "Cannot resize room - would overlap with other rooms");
+    }
+  }
+
+  void resizeCutout(double newWidth, double newHeight) {
+    if (selectedCutOut == null) {
+      Fluttertoast.showToast(msg: "Please select a cutout first");
+      return;
+    }
+
+    if (_floorBase == null) {
+      Fluttertoast.showToast(msg: "No base exists");
+      return;
+    }
+
+    // Check if new dimensions are valid
+    if (newWidth <= 0 || newHeight <= 0) {
+      Fluttertoast.showToast(
+          msg: "Invalid dimensions. Must be greater than 0.");
+      return;
+    }
+
+    // Store current position
+    Offset currentPosition = selectedCutOut!.position;
+
+    // Check if the room would still fit within the base with new dimensions
+    if (!_roomFitsWithinBase(newWidth, newHeight, currentPosition)) {
+      Fluttertoast.showToast(
+          msg: "New size would place room outside base boundaries");
+      return;
+    }
+
+    // Create a temporary list without the selected room to check overlap
+    List<CutOut> otherCutOuts =
+        _cutOuts.where((cutOut) => cutOut != selectedCutOut).toList();
+
+    // Check for overlaps with other rooms
+    bool wouldOverlap = false;
+    for (final existingCutOut in otherCutOuts) {
+      if (_checkOverlap(
+          currentPosition,
+          newWidth,
+          newHeight,
+          existingCutOut.position,
+          existingCutOut.width,
+          existingCutOut.height)) {
+        wouldOverlap = true;
+        break;
+      }
+    }
+
+    if (!wouldOverlap) {
+      selectedCutOut!.width = newWidth;
+      selectedCutOut!.height = newHeight;
+      Fluttertoast.showToast(msg: "Cutout resized successfully");
+      // _saveState();
+      notifyListeners();
+    } else {
+      Fluttertoast.showToast(
+          msg: "Cannot resize cutout - would overlap with other cutouts");
     }
   }
 
@@ -866,8 +1272,13 @@ class FloorPlanController extends ChangeNotifier {
   Stairs? selectStairs(String name) {
     for (Stairs stairs in _stairs) {
       if (stairs.name == name) {
+        deselectStairs();
         selectedStairs = stairs;
         deselectRoom();
+        deselectCutOut();
+        deselectDoor();
+        deselectWindow();
+        deselectSpace();
         return stairs;
       }
     }
@@ -1067,6 +1478,54 @@ class FloorPlanController extends ChangeNotifier {
       case "south":
         newX = referenceRoom.position.dx;
         newY = referenceRoom.position.dy + referenceRoom.height + roomSpacing;
+        break;
+      default:
+        Fluttertoast.showToast(msg: "Invalid direction specified");
+        return;
+    }
+
+    moveStairs(newX, newY);
+  }
+
+  void moveStairsRelativeToCutout(int referenceCutoutIndex, String direction) {
+    if (selectedStairs == null) {
+      Fluttertoast.showToast(msg: "Please select stairs first");
+      return;
+    }
+
+    if (referenceCutoutIndex < 0 || referenceCutoutIndex >= _cutOuts.length) {
+      Fluttertoast.showToast(msg: "Invalid cutout reference");
+      return;
+    }
+
+    CutOut referenceCutout = _cutOuts[referenceCutoutIndex];
+    double newX = selectedStairs!.position.dx;
+    double newY = selectedStairs!.position.dy;
+
+    switch (direction.toLowerCase()) {
+      case "right":
+      case "east":
+        newX =
+            referenceCutout.position.dx + referenceCutout.width + roomSpacing;
+        newY = referenceCutout.position.dy;
+        break;
+      case "left":
+      case "west":
+        newX =
+            referenceCutout.position.dx - selectedStairs!.width - roomSpacing;
+        newY = referenceCutout.position.dy;
+        break;
+      case "above":
+      case "north":
+        newX = referenceCutout.position.dx;
+        newY =
+            referenceCutout.position.dy - selectedStairs!.length - roomSpacing;
+        break;
+      case "below":
+      case "south":
+        newX = referenceCutout.position.dx;
+        newY =
+            referenceCutout.position.dy + referenceCutout.height + roomSpacing;
         break;
       default:
         Fluttertoast.showToast(msg: "Invalid direction specified");

@@ -5,12 +5,12 @@ import 'package:saysketch_v2/models/space.dart';
 
 class CutOut {
   final String name;
-  final double width;
-  final double height;
-  final Offset position;
-  final List<Door> doors = [];
-  final List<Window> windows = [];
-  final List<Space> spaces = [];
+  double width;
+  double height;
+  Offset position;
+  List<Door> doors = [];
+  List<Window> windows = [];
+  List<Space> spaces = [];
   int _doorCounter = 0;
   int _windowCounter = 0;
   int _spaceCounter = 0;

@@ -171,31 +171,23 @@ class CommandController {
         tokens.contains("cutout")) {
       _handleAddCutOutCommand(command, tokens);
       return;
-    }
-
-    if (tokens.contains("add") && tokens.contains("space")) {
+    } else if (tokens.contains("add") && tokens.contains("space")) {
       _handleAddSpaceCommand(tokens);
       return;
-    }
-
-    if (tokens.contains("select") && tokens.contains("space")) {
+    } else if (tokens.contains("select") && tokens.contains("space")) {
       _handleSelectSpaceCommand(tokens);
       return;
-    }
-
-    if (tokens.contains("move") && tokens.contains("space")) {
+    } else if (tokens.contains("move") && tokens.contains("space")) {
       _handleMoveSpaceCommand(tokens);
       return;
-    }
-
-    if ((tokens.contains("remove") || tokens.contains("delete")) &&
+    } else if ((tokens.contains("remove") || tokens.contains("delete")) &&
         tokens.contains("space")) {
       _handleRemoveSpaceCommand(tokens);
       return;
+    } else {
+      Fluttertoast.showToast(msg: "Invalid Command: $command");
+      return;
     }
-
-    Fluttertoast.showToast(msg: "Invalid Command: $command");
-    return;
   }
 
   void _handleHideCommand(List<String> tokens) {
@@ -364,8 +356,11 @@ class CommandController {
         int referenceRoomIndex = _findReferenceRoomIndex(
             tokens, floorPlanController?.getRooms() ?? []);
         int referenceStairsIndex = _findReferenceStairsIndex(tokens);
+        int referenceCutoutIndex = _findReferenceCutoutIndex(tokens);
 
-        if (referenceRoomIndex != -1 || referenceStairsIndex != -1) {
+        if (referenceRoomIndex != -1 ||
+            referenceStairsIndex != -1 ||
+            referenceCutoutIndex != -1) {
           for (String direction in [
             "right",
             "left",
@@ -380,9 +375,12 @@ class CommandController {
               if (referenceRoomIndex != -1) {
                 floorPlanController?.moveStairsRelativeToRoom(
                     referenceRoomIndex, direction);
-              } else {
+              } else if (referenceStairsIndex != -1) {
                 floorPlanController?.moveStairsRelativeToOther(
                     referenceStairsIndex, direction);
+              } else if (referenceCutoutIndex != -1) {
+                floorPlanController?.moveStairsRelativeToCutout(
+                    referenceCutoutIndex, direction);
               }
               return;
             }
@@ -450,8 +448,11 @@ class CommandController {
         int referenceRoomIndex = _findReferenceRoomIndex(
             tokens, floorPlanController?.getRooms() ?? []);
         int referenceStairsIndex = _findReferenceStairsIndex(tokens);
+        int referenceCutoutIndex = _findReferenceCutoutIndex(tokens);
 
-        if (referenceRoomIndex != -1 || referenceStairsIndex != -1) {
+        if (referenceRoomIndex != -1 ||
+            referenceStairsIndex != -1 ||
+            referenceCutoutIndex != -1) {
           for (String direction in [
             "right",
             "left",
@@ -466,9 +467,12 @@ class CommandController {
               if (referenceRoomIndex != -1) {
                 floorPlanController?.moveRoomRelativeToOther(
                     referenceRoomIndex, direction);
-              } else {
+              } else if (referenceStairsIndex != -1) {
                 floorPlanController?.moveRoomRelativeToStairs(
                     referenceStairsIndex, direction);
+              } else if (referenceCutoutIndex != -1) {
+                floorPlanController?.moveRoomRelativeToCutout(
+                    referenceCutoutIndex, direction);
               }
               return;
             }
@@ -533,6 +537,101 @@ class CommandController {
 
       MessageService.showMessage(floorManagerController.context,
           "Invalid room move command. Try: 'move to center', 'move 5 feet right', 'move to the right of bedroom', 'move to the left of stairs 1'",
+          type: MessageType.error);
+    } else if (floorPlanController?.selectedCutOut != null) {
+      // Handle cutout movement
+      if (tokens.contains("to")) {
+        // Handle predefined positions for stairs
+        for (String position in [
+          "center",
+          "top",
+          "bottom",
+        ]) {
+          if (tokens.contains(position)) {
+            floorPlanController?.moveCutoutToPosition(
+                position, tokens, context);
+            return;
+          }
+        }
+
+        // Handle relative positioning to rooms or other stairs
+        int referenceRoomIndex = _findReferenceRoomIndex(
+            tokens, floorPlanController?.getRooms() ?? []);
+        int referenceStairsIndex = _findReferenceStairsIndex(tokens);
+        int referenceCutoutIndex = _findReferenceCutoutIndex(tokens);
+
+        if (referenceRoomIndex != -1 ||
+            referenceStairsIndex != -1 ||
+            referenceCutoutIndex != -1) {
+          for (String direction in [
+            "right",
+            "left",
+            "above",
+            "below",
+            "north",
+            "south",
+            "east",
+            "west"
+          ]) {
+            if (tokens.contains(direction)) {
+              if (referenceRoomIndex != -1) {
+                floorPlanController?.moveCutoutRelativeToRoom(
+                    referenceRoomIndex, direction);
+              } else if (referenceCutoutIndex != -1) {
+                floorPlanController?.moveCutoutRelativeToOther(
+                    referenceCutoutIndex, direction);
+              } else if (referenceStairsIndex != -1) {
+                floorPlanController?.moveCutoutRelativeToStairs(
+                    referenceStairsIndex, direction);
+              }
+              return;
+            }
+          }
+        }
+      }
+
+      // Rest of stairs movement handling...
+      double? distance = _extractDistance(tokens);
+      if (distance != null) {
+        for (String direction in [
+          "right",
+          "left",
+          "up",
+          "down",
+          "north",
+          "south",
+          "east",
+          "west"
+        ]) {
+          if (tokens.contains(direction)) {
+            print(
+                "floorPlanController?.moveCutoutRelative(distance, direction);");
+            floorPlanController?.moveCutoutRelative(distance, direction);
+            return;
+          }
+        }
+      }
+
+      // Handle absolute coordinates for stairs...
+      try {
+        int xIndex = tokens.indexOf("x");
+        int yIndex = tokens.indexOf("y");
+
+        if (xIndex != -1 &&
+            yIndex != -1 &&
+            xIndex + 1 < tokens.length &&
+            yIndex + 1 < tokens.length) {
+          double x = double.parse(tokens[xIndex + 1]);
+          double y = double.parse(tokens[yIndex + 1]);
+          floorPlanController?.moveCutout(x, y);
+          return;
+        }
+      } catch (e) {
+        // Handle parsing errors
+      }
+
+      MessageService.showMessage(floorManagerController.context,
+          "Invalid stairs move command. Try: 'move stairs to center', 'move stairs 5 feet right', 'move stairs to the right of bedroom', 'move stairs to the left of stairs 1'",
           type: MessageType.error);
     } else {
       MessageService.showMessage(floorManagerController.context,
@@ -753,6 +852,23 @@ class CommandController {
     return -1;
   }
 
+  // Helper function to find reference cutout index
+  int _findReferenceCutoutIndex(List<String> tokens) {
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i].toLowerCase() == "cutout") {
+        if (i + 1 < tokens.length) {
+          try {
+            return int.parse(tokens[i + 1]) - 1; // Convert to 0-based index
+          } catch (e) {
+            // If next token isn't a number, might be named cutout
+            continue;
+          }
+        }
+      }
+    }
+    return -1;
+  }
+
   Map<String, double> extractMeasurements(String command) {
     // Updated regex to handle decimal numbers
     RegExp regExp = RegExp(
@@ -883,9 +999,60 @@ class CommandController {
           "Invalid resize command. Try: 'resize to X by Y', 'change width to X', or 'increase height by Z%'",
           type: MessageType.error);
       return;
+    } else if (floorPlanController?.selectedCutOut != null) {
+      // Handle single dimension changes first
+      if (_handleSingleDimensionChange(tokens)) {
+        return;
+      }
+
+      // Handle "resize to X by Y" format
+      if (tokens.contains("to") &&
+          (tokens.contains("by") ||
+              tokens.contains("x") ||
+              tokens.contains("/"))) {
+        String command = tokens.join(" ");
+        Map<String, double> dimensions = extractMeasurements(command);
+        if (dimensions.isNotEmpty) {
+          floorPlanController?.resizeCutout(
+              dimensions['width']!, dimensions['height']!);
+          return;
+        }
+      }
+
+      // Handle increase/decrease by percentage for both dimensions
+      if (tokens.contains("increase") || tokens.contains("decrease")) {
+        bool increase = tokens.contains("increase");
+        double? percentage;
+
+        for (int i = 0; i < tokens.length - 1; i++) {
+          if (tokens[i] == "by" && tokens[i + 1].endsWith("%")) {
+            try {
+              percentage =
+                  double.parse(tokens[i + 1].replaceAll("%", "")) / 100;
+              break;
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+
+        if (percentage != null) {
+          double factor = increase ? (1 + percentage) : (1 - percentage);
+          double newWidth = floorPlanController!.selectedCutOut!.width * factor;
+          double newHeight =
+              floorPlanController!.selectedCutOut!.height * factor;
+          floorPlanController?.resizeCutout(newWidth, newHeight);
+          return;
+        }
+      }
+
+      MessageService.showMessage(floorManagerController.context,
+          "Invalid resize command. Try: 'resize to X by Y', 'change width to X', or 'increase height by Z%'",
+          type: MessageType.error);
+      return;
     } else {
       MessageService.showMessage(floorManagerController.context,
-          "Please select a room or stairs first.",
+          "Please select a room or stairs or cutout first.",
           type: MessageType.error);
     }
   }
@@ -949,6 +1116,74 @@ class CommandController {
           floorPlanController!.resizeRoom(newValue, selectedRoom!.height);
         } else {
           floorPlanController!.resizeRoom(selectedRoom!.width, newValue);
+        }
+        return true;
+      }
+
+      MessageService.showMessage(floorManagerController.context,
+          "Invalid $dimension change. Try: 'change $dimension to X' or 'increase $dimension by Y%'",
+          type: MessageType.error);
+      return true;
+    } else if (floorPlanController?.selectedCutOut != null) {
+      bool isWidth = tokens.contains("width");
+      bool isHeight = tokens.contains("height");
+
+      if (!isWidth && !isHeight) return false;
+
+      // Prevent ambiguous commands
+      if (isWidth && isHeight) {
+        MessageService.showMessage(floorManagerController.context,
+            "Please specify only one dimension at a time",
+            type: MessageType.error);
+        return true;
+      }
+
+      String dimension = isWidth ? "width" : "height";
+      double currentValue = isWidth
+          ? floorPlanController!.selectedCutOut!.width
+          : floorPlanController!.selectedCutOut!.height;
+      double? newValue;
+
+      // Handle absolute value changes (e.g., "change width to 15 feet")
+      if (tokens.contains("to")) {
+        int toIndex = tokens.indexOf("to");
+        if (toIndex + 1 < tokens.length) {
+          try {
+            double value = double.parse(tokens[toIndex + 1]);
+            String? unit =
+                toIndex + 2 < tokens.length ? tokens[toIndex + 2] : null;
+            if (unit != null) {
+              value = floorPlanController!.convertToMetricUnits(value, unit);
+            }
+            newValue = value;
+          } catch (e) {
+            // Handle parsing error
+          }
+        }
+      }
+      // Handle percentage changes (e.g., "increase width by 20%")
+      else if (tokens.contains("by")) {
+        bool increase = tokens.contains("increase");
+        int byIndex = tokens.indexOf("by");
+        if (byIndex + 1 < tokens.length && tokens[byIndex + 1].endsWith("%")) {
+          try {
+            double percentage =
+                double.parse(tokens[byIndex + 1].replaceAll("%", "")) / 100;
+            double factor = increase ? (1 + percentage) : (1 - percentage);
+            newValue = currentValue * factor;
+          } catch (e) {
+            // Handle parsing error
+          }
+        }
+      }
+
+      if (newValue != null && newValue > 0) {
+        if (isWidth) {
+          floorPlanController!.resizeCutout(
+              newValue, floorPlanController!.selectedCutOut!.height);
+        } else {
+          floorPlanController!.resizeCutout(
+              floorPlanController!.selectedCutOut!.width, newValue);
         }
         return true;
       }
