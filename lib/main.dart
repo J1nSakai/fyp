@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:provider/provider.dart';
-import 'package:saysketch_v2/views/home_view.dart';
 import 'package:saysketch_v2/views/intro_view.dart';
 
 void main() {

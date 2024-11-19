@@ -9,6 +9,7 @@ import 'package:saysketch_v2/views/widgets/entity_info_panel.dart';
 import 'floor_plan_view.dart';
 import 'widgets/command_history_panel.dart';
 import 'widgets/compass_widget.dart';
+import 'widgets/voice_commands_guide.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -103,7 +104,6 @@ class _HomeViewState extends State<HomeView> {
                   Row(
                     children: [
                       Semantics(
-                        label: "V-Architect Logo",
                         image: true,
                         child: SvgPicture.asset(
                           'app_icon/new_icon.svg',
@@ -128,12 +128,11 @@ class _HomeViewState extends State<HomeView> {
                   Row(
                     children: [
                       _buildActionButton(
+                        label:
+                            _showSettings ? 'Hide settings' : 'Show settings',
                         icon: _showSettings
                             ? Icons.keyboard_arrow_up
                             : Icons.keyboard_arrow_down,
-                        label: _showSettings
-                            ? 'hide more options'
-                            : 'show more options',
                         onPressed: () =>
                             setState(() => _showSettings = !_showSettings),
                         isActive: _showSettings,
@@ -148,8 +147,10 @@ class _HomeViewState extends State<HomeView> {
                         ),
                       ),
                       _buildActionButton(
+                        label: _showCommandHistory
+                            ? 'Hide command history'
+                            : 'Show command history',
                         icon: Icons.history,
-                        label: 'history',
                         onPressed: () => setState(
                             () => _showCommandHistory = !_showCommandHistory),
                         isActive: _showCommandHistory,
@@ -164,8 +165,8 @@ class _HomeViewState extends State<HomeView> {
                         ),
                       ),
                       _buildActionButton(
+                        label: 'Help',
                         icon: Icons.help_outline,
-                        label: 'help',
                         onPressed: () => _showCommandsDialog(context),
                       ),
                     ],
@@ -284,12 +285,12 @@ class _HomeViewState extends State<HomeView> {
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           width: _shouldShowInfoPanel()
-                              ? MediaQuery.of(context).size.width * 0.2
+                              ? MediaQuery.sizeOf(context).width * 0.2
                               : 0,
                           curve: Curves.easeInOut,
                           child: OverflowBox(
                             alignment: Alignment.centerRight,
-                            maxWidth: MediaQuery.of(context).size.width * 0.2,
+                            maxWidth: MediaQuery.sizeOf(context).width * 0.2,
                             child: EntityInfoPanel(
                               floorManagerController: _floorManager,
                             ),
@@ -336,186 +337,199 @@ class _HomeViewState extends State<HomeView> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Buttons Container with Animation
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    transform: Matrix4.translationValues(
-                      _showTextField ? 0 : 0, // Slide from center to right
-                      0,
-                      0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Keyboard Toggle Button
-                        if (!_showTextField)
-                          Semantics(
-                            button: true,
-                            label: "Show text input",
-                            child: Tooltip(
-                              message: "Use text commands",
-                              child: Material(
-                                elevation: 4,
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  height: 64,
-                                  width: 64,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withOpacity(0.1),
-                                  ),
-                                  child: IconButton(
-                                    icon: Icon(
-                                      Icons.keyboard,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                      size: 28,
-                                    ),
-                                    onPressed: () {
-                                      setState(() => _showTextField = true);
-                                      Future.delayed(
-                                          const Duration(milliseconds: 50), () {
-                                        _focusNode.requestFocus();
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ),
+                  // Center microphone button
+                  Center(
+                    child: Semantics(
+                      button: true,
+                      enabled: true,
+                      hint: _isListening
+                          ? "Currently listening. Say 'stop listening' to stop"
+                          : "Click to start continuous listening",
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          height: 90,
+                          width: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: _isListening
+                                  ? [
+                                      Theme.of(context).colorScheme.error,
+                                      Theme.of(context)
+                                          .colorScheme
+                                          .error
+                                          .withRed(255),
+                                    ]
+                                  : [
+                                      Theme.of(context).colorScheme.tertiary,
+                                      Theme.of(context)
+                                          .colorScheme
+                                          .tertiary
+                                          .withRed(255),
+                                    ],
                             ),
                           ),
-                        const SizedBox(width: 24),
-                        // Microphone Button
-                        Semantics(
-                          button: true,
-                          enabled: true,
-                          label: _isListening ? "stop listening" : "listen",
-                          hint: _isListening
-                              ? "Click to stop voice input"
-                              : "Click to start voice input",
-                          child: Material(
-                            elevation: 4,
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              height: 64,
-                              width: 64,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: _isListening
-                                      ? [
-                                          Theme.of(context).colorScheme.error,
-                                          Theme.of(context)
-                                              .colorScheme
-                                              .error
-                                              .withRed(255),
-                                        ]
-                                      : [
-                                          Theme.of(context)
-                                              .colorScheme
-                                              .tertiary,
-                                          Theme.of(context)
-                                              .colorScheme
-                                              .tertiary
-                                              .withRed(255),
-                                        ],
-                                ),
-                              ),
-                              child: IconButton(
-                                icon: Icon(
+                          child: IconButton(
+                            onPressed:
+                                _isListening ? _stopListening : _startListening,
+                            icon: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
                                   _isListening ? Icons.mic_off : Icons.mic,
                                   color: Colors.white,
                                   size: 32,
                                 ),
-                                onPressed: _isListening
-                                    ? _stopListening
-                                    : _startListening,
-                              ),
+                                Text(
+                                  _isListening
+                                      ? 'Stop listening'
+                                      : 'Start listening',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
 
-                  // Text Field with Animation
-                  if (_showTextField)
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      right: 32,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          // Close Text Field Button
-                          Semantics(
+                  // Right-aligned text input button or text field
+                  Positioned(
+                    right: 32,
+                    child: !_showTextField
+                        ? Semantics(
                             button: true,
-                            label: "Hide text input",
-                            child: IconButton(
-                              icon: Icon(
-                                Icons.close,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _showTextField = false),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Text Field
-                          Container(
-                            width: 300,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withOpacity(0.2),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: TextField(
-                              controller: _controller,
-                              decoration: InputDecoration(
-                                hintText: "Type your command here...",
-                                hintStyle: TextStyle(
+                            hint: "Click to show text input",
+                            child: Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                height: 90,
+                                width: 100,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
                                   color: Theme.of(context)
                                       .colorScheme
                                       .primary
-                                      .withOpacity(0.5),
-                                  fontSize: 15,
+                                      .withOpacity(0.1),
                                 ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
+                                child: IconButton(
+                                  icon: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.keyboard,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                        size: 28,
+                                      ),
+                                      const Text(
+                                        'Text input',
+                                        style: TextStyle(
+                                          color: Colors.black87,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  onPressed: () {
+                                    setState(() => _showTextField = true);
+                                    Future.delayed(
+                                        const Duration(milliseconds: 50), () {
+                                      _focusNode.requestFocus();
+                                    });
+                                  },
                                 ),
                               ),
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withOpacity(0.8),
-                              ),
-                              onSubmitted: (text) {
-                                _handleTextCommand(text);
-                                _controller.clear();
-                                _focusNode.requestFocus();
-                              },
-                              focusNode: _focusNode,
                             ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              // Close Text Field Button
+                              IconButton(
+                                icon: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.close,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                    Text(
+                                      'Close',
+                                      style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                onPressed: () =>
+                                    setState(() => _showTextField = false),
+                              ),
+                              const SizedBox(width: 12),
+                              // Text Field
+                              Container(
+                                width: 300,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.2),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: TextField(
+                                  controller: _controller,
+                                  decoration: InputDecoration(
+                                    hintText: "Type your command here...",
+                                    hintStyle: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withOpacity(0.5),
+                                      fontSize: 15,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.8),
+                                  ),
+                                  onSubmitted: (text) {
+                                    _handleTextCommand(text);
+                                    _controller.clear();
+                                    _focusNode.requestFocus();
+                                  },
+                                  focusNode: _focusNode,
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                            ],
                           ),
-                          const SizedBox(width: 24),
-                        ],
-                      ),
-                    ),
+                  ),
                 ],
               ),
             ),
@@ -528,42 +542,7 @@ class _HomeViewState extends State<HomeView> {
   void _showCommandsDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Available Commands"),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CommandItem(
-                command: "create base", description: "Create a new floor base"),
-            CommandItem(command: "add room", description: "Add a new room"),
-            CommandItem(
-                command: "another room", description: "Add another room"),
-            CommandItem(
-                command: "remove base", description: "Remove the floor base"),
-            CommandItem(
-                command: "remove rooms", description: "Remove all rooms"),
-            CommandItem(
-                command: "remove last room",
-                description: "Remove the last room"),
-            CommandItem(
-                command: "add new floor", description: "Add a new floor"),
-            CommandItem(
-                command: "switch to floor X",
-                description: "Switch to specified floor"),
-          ],
-        ),
-        actions: [
-          Semantics(
-            button: true,
-            label: "Close",
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Close"),
-            ),
-          ),
-        ],
-      ),
+      builder: (context) => const VoiceCommandsDialog(),
     );
   }
 
@@ -576,21 +555,29 @@ class _HomeViewState extends State<HomeView> {
     return Semantics(
       button: true,
       enabled: true,
-      label: label,
-      child: Tooltip(
-        message: label,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: IconButton(
-            icon: Icon(
-              icon,
-              color: isActive
-                  ? Theme.of(context).colorScheme.tertiary
-                  : Colors.white.withOpacity(0.9),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                icon,
+                color: isActive
+                    ? Theme.of(context).colorScheme.tertiary
+                    : Colors.white.withOpacity(0.9),
+              ),
+              onPressed: onPressed,
+              hoverColor: Colors.white.withOpacity(0.1),
             ),
-            onPressed: onPressed,
-            hoverColor: Colors.white.withOpacity(0.1),
-          ),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -603,20 +590,31 @@ class _HomeViewState extends State<HomeView> {
   }) {
     return Tooltip(
       message: label,
-      child: TextButton.icon(
+      child: TextButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: Colors.white.withOpacity(0.9)),
-        label: Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-          ),
-        ),
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: Colors.white.withOpacity(0.9),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
         ),
       ),
     );
@@ -630,39 +628,5 @@ class _HomeViewState extends State<HomeView> {
         controller?.selectedWindow != null ||
         controller?.selectedCutOut != null ||
         controller?.selectedSpace != null;
-  }
-}
-
-class CommandItem extends StatelessWidget {
-  final String command;
-  final String description;
-
-  const CommandItem({
-    super.key,
-    required this.command,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "• $command",
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              "- $description",
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

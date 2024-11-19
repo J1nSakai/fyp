@@ -100,7 +100,7 @@ class FloorManagerController extends ChangeNotifier {
         builder: (BuildContext context) {
           return Dialog(
             child: Container(
-              width: 400, // Fixed width for web dialog
+              width: 400,
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -109,23 +109,22 @@ class FloorManagerController extends ChangeNotifier {
                   // Dialog Header
                   Row(
                     children: [
-                      const Text(
+                      Text(
                         'Save As',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const Spacer(),
-                      // Close button
-                      Semantics(
-                        button: true,
-                        label: "Close",
-                        child: IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                          splashRadius: 20,
+                      IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
+                        onPressed: () => Navigator.pop(context),
+                        splashRadius: 20,
                       ),
                     ],
                   ),
@@ -135,12 +134,48 @@ class FloorManagerController extends ChangeNotifier {
                     controller: fileNameController,
                     decoration: InputDecoration(
                       labelText: 'File name',
+                      labelStyle: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.7),
+                      ),
                       hintText: 'Enter file name',
+                      hintStyle: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.2),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.2),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
+                      fillColor: Theme.of(context).colorScheme.surface,
+                    ),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -148,7 +183,10 @@ class FloorManagerController extends ChangeNotifier {
                   Text(
                     '*.json',
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -157,41 +195,38 @@ class FloorManagerController extends ChangeNotifier {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Semantics(
-                        button: true,
-                        label: "Cancel",
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          child: const Text('Cancel'),
+                          foregroundColor:
+                              Theme.of(context).colorScheme.primary,
                         ),
+                        child: const Text('Cancel'),
                       ),
                       const SizedBox(width: 8),
-                      Semantics(
-                        button: true,
-                        label: "Save",
-                        child: ElevatedButton(
-                          onPressed: () {
-                            String tempFileName = fileNameController.text;
-                            // Add .json extension if not present
-                            if (!tempFileName.toLowerCase().endsWith('.json')) {
-                              tempFileName += '.json';
-                            }
-                            Navigator.pop(context, tempFileName);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
+                      ElevatedButton(
+                        onPressed: () {
+                          String tempFileName = fileNameController.text;
+                          if (!tempFileName.toLowerCase().endsWith('.json')) {
+                            tempFileName += '.json';
+                          }
+                          Navigator.pop(context, tempFileName);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          child: const Text('Save'),
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimary,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primary,
                         ),
+                        child: const Text('Save'),
                       ),
                     ],
                   ),

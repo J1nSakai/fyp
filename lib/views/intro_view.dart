@@ -315,14 +315,13 @@ class _IntroViewState extends State<IntroView> {
                       Center(
                         child: Semantics(
                           button: true,
-                          label: "start designing",
                           hint: "Navigate to the main design interface",
                           child: SizedBox(
                             width: 200,
                             height: 50,
                             child: ElevatedButton(
                               onPressed: () {
-                                Navigator.pushReplacement(
+                                Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => Provider.value(
