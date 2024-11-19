@@ -406,7 +406,6 @@ class _HomeViewState extends State<HomeView> {
                     right: 32,
                     child: !_showTextField
                         ? Semantics(
-                            button: true,
                             hint: "Click to show text input",
                             child: Material(
                               elevation: 4,

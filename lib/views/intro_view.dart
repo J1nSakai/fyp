@@ -153,7 +153,7 @@ class _IntroViewState extends State<IntroView> {
                                                       .error),
                                               const SizedBox(width: 12),
                                               const Text(
-                                                "System Requirements",
+                                                "Application Requirements",
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 16,
@@ -163,9 +163,10 @@ class _IntroViewState extends State<IntroView> {
                                           ),
                                           const SizedBox(height: 12),
                                           Text(
-                                            "• Voice Access must be downloaded\n"
-                                            "• Basic knowledge of Voice Access and its commands\n"
-                                            "• A good web browser",
+                                            "• Voice Access must be downloaded.\n"
+                                            "• Basic knowledge of Voice Access and its commands.\n"
+                                            "• A good microphone.\n"
+                                            "• A good web browser.",
                                             style: TextStyle(
                                               color: Colors.grey[700],
                                               height: 1.5,
@@ -297,9 +298,9 @@ class _IntroViewState extends State<IntroView> {
                                       Expanded(
                                         child: _buildFeatureCard(
                                           icon: Icons.save,
-                                          title: "Save & Export",
+                                          title: "Save & Load",
                                           description:
-                                              "Save designs locally or export for sharing.",
+                                              "Save designs locally or load existing designs.",
                                         ),
                                       ),
                                     ],
@@ -314,7 +315,6 @@ class _IntroViewState extends State<IntroView> {
                       // Start Button
                       Center(
                         child: Semantics(
-                          button: true,
                           hint: "Navigate to the main design interface",
                           child: SizedBox(
                             width: 200,
@@ -377,7 +377,7 @@ class _IntroViewState extends State<IntroView> {
   }) {
     return Container(
       width: double.infinity,
-      height: 180,
+      height: 190,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.grey[50],

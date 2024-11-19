@@ -92,11 +92,15 @@ class FloorManagerController extends ChangeNotifier {
 
   void saveToFile() async {
     try {
+      // Capture context early
+      final currentContext = context;
+
       TextEditingController fileNameController =
           TextEditingController(text: 'floorplan.json');
+
       // Show a dialog to get the file name
       String? fileName = await showDialog<String>(
-        context: context,
+        context: currentContext, // Use captured context
         builder: (BuildContext context) {
           return Dialog(
             child: Container(
@@ -259,7 +263,9 @@ class FloorManagerController extends ChangeNotifier {
       final bytes = utf8.encode(jsonString);
       final blob = html.Blob([bytes]);
       final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
+
+      // Chain the download operations
+      html.AnchorElement(href: url)
         ..setAttribute('download', fileName)
         ..click();
 
@@ -267,7 +273,7 @@ class FloorManagerController extends ChangeNotifier {
       html.Url.revokeObjectUrl(url);
 
       MessageService.showMessage(
-        context,
+        currentContext, // Use captured context
         "Floor plan saved successfully as '$fileName'",
         type: MessageType.success,
       );
@@ -281,6 +287,9 @@ class FloorManagerController extends ChangeNotifier {
   }
 
   void loadFromFile() {
+    // Capture context early
+    final currentContext = context;
+
     try {
       // Create file input element
       final uploadInput = html.FileUploadInputElement();
@@ -321,13 +330,13 @@ class FloorManagerController extends ChangeNotifier {
             notifyListeners();
 
             MessageService.showMessage(
-              context,
+              currentContext, // Use captured context
               "Floor plan loaded successfully",
               type: MessageType.success,
             );
           } catch (e) {
             MessageService.showMessage(
-              context,
+              currentContext, // Use captured context
               "Error parsing floor plan file: $e",
               type: MessageType.error,
             );
@@ -338,7 +347,7 @@ class FloorManagerController extends ChangeNotifier {
       });
     } catch (e) {
       MessageService.showMessage(
-        context,
+        currentContext, // Use captured context
         "Error loading floor plan: $e",
         type: MessageType.error,
       );
