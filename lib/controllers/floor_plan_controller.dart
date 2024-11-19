@@ -452,6 +452,13 @@ class FloorPlanController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void removeSelectedCutOut() {
+    _cutOuts.remove(selectedCutOut);
+    deselectCutOut();
+    // _saveState();
+    notifyListeners();
+  }
+
   // All stairs removal methods:
   void removeSelectedStairs() {
     if (selectedStairs != null) {
@@ -1925,8 +1932,8 @@ class FloorPlanController extends ChangeNotifier {
 
     // Calculate opposite wall and offset for connecting door
     String oppositeWall = _getOppositeWall(sourceDoor.wall);
-    double adjacentOffset =
-        _calculateAdjacentDoorOffset(sourceRoom, adjacentRoom, sourceDoor);
+    double adjacentOffset = _calculateAdjacentDoorOffsetForRoom(
+        sourceRoom, adjacentRoom, sourceDoor);
 
     // Validate door placement in adjacent room
     if (!adjacentRoom.canAddDoor(
@@ -2027,7 +2034,7 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  double _calculateAdjacentDoorOffset(
+  double _calculateAdjacentDoorOffsetForRoom(
       Room sourceRoom, Room adjacentRoom, Door sourceDoor) {
     bool isHorizontal = (sourceDoor.wall == "north" ||
         sourceDoor.wall == "south" ||
@@ -2043,6 +2050,22 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
+  double _calculateAdjacentDoorOffsetForCutOut(
+      CutOut sourceCutOut, CutOut adjacentCutOut, Door sourceDoor) {
+    bool isHorizontal = (sourceDoor.wall == "north" ||
+        sourceDoor.wall == "south" ||
+        sourceDoor.wall == "up" ||
+        sourceDoor.wall == "down");
+
+    if (isHorizontal) {
+      double diff = adjacentCutOut.position.dx - sourceCutOut.position.dx;
+      return sourceDoor.offsetFromWallStart - diff;
+    } else {
+      double diff = adjacentCutOut.position.dy - sourceCutOut.position.dy;
+      return sourceDoor.offsetFromWallStart - diff;
+    }
+  }
+
   // Door modification methods
   void moveDoor(double newOffset) {
     if (selectedDoor == null) {
@@ -2052,57 +2075,114 @@ class FloorPlanController extends ChangeNotifier {
 
     // Find the room that contains the selected door
     Room? doorRoom = _findRoomByDoor(selectedDoor!);
-    if (doorRoom == null) {
-      Fluttertoast.showToast(msg: "Could not find room for selected door");
-      return;
-    }
+    CutOut? cutoutRoom = _findCutOutByDoor(selectedDoor!);
+    if (doorRoom != null) {
+      // Calculate wall length based on door's wall
+      double wallLength = (selectedDoor!.wall == "north" ||
+              selectedDoor!.wall == "south" ||
+              selectedDoor!.wall == "up" ||
+              selectedDoor!.wall == "down")
+          ? doorRoom.width
+          : doorRoom.height;
 
-    // Calculate wall length based on door's wall
-    double wallLength = (selectedDoor!.wall == "north" ||
-            selectedDoor!.wall == "south" ||
-            selectedDoor!.wall == "up" ||
-            selectedDoor!.wall == "down")
-        ? doorRoom.width
-        : doorRoom.height;
+      // Adjust door width for small rooms
+      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
 
-    // Adjust door width for small rooms
-    double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+      // Adjust minimum corner distance for small rooms
+      double minCornerDistance =
+          (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
 
-    // Adjust minimum corner distance for small rooms
-    double minCornerDistance =
-        (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
+      // Calculate valid range for door placement
+      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+      double minOffset = minCornerDistance;
 
-    // Calculate valid range for door placement
-    double maxOffset = wallLength - calculatedWidth - minCornerDistance;
-    double minOffset = minCornerDistance;
+      if (newOffset >= minOffset && newOffset <= maxOffset) {
+        selectedDoor!.offsetFromWallStart = newOffset;
 
-    if (newOffset >= minOffset && newOffset <= maxOffset) {
-      selectedDoor!.offsetFromWallStart = newOffset;
-
-      // Update connected door if exists
-      if (selectedDoor!.connectedDoor != null) {
-        Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
-        if (connectedRoom != null) {
-          double newConnectedOffset = _calculateAdjacentDoorOffset(
-              doorRoom, connectedRoom, selectedDoor!);
-          selectedDoor!.connectedDoor!.offsetFromWallStart = newConnectedOffset;
+        // Update connected door if exists
+        if (selectedDoor!.connectedDoor != null) {
+          Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
+          if (connectedRoom != null) {
+            double newConnectedOffset = _calculateAdjacentDoorOffsetForRoom(
+                doorRoom, connectedRoom, selectedDoor!);
+            selectedDoor!.connectedDoor!.offsetFromWallStart =
+                newConnectedOffset;
+          }
         }
-      }
 
-      // _saveState()();
-      notifyListeners();
-      Fluttertoast.showToast(msg: "Door moved");
+        // _saveState();
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Door moved");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid door position. Door must be at least ${minCornerDistance}ft from corners.");
+      }
+    } else if (cutoutRoom != null) {
+      // Calculate wall length based on door's wall
+      double wallLength = (selectedDoor!.wall == "north" ||
+              selectedDoor!.wall == "south" ||
+              selectedDoor!.wall == "up" ||
+              selectedDoor!.wall == "down")
+          ? cutoutRoom.width
+          : cutoutRoom.height;
+
+      // Adjust door width for small rooms
+      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+
+      // Adjust minimum corner distance for small rooms
+      double minCornerDistance =
+          (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
+
+      // Calculate valid range for door placement
+      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+      double minOffset = minCornerDistance;
+
+      if (newOffset >= minOffset && newOffset <= maxOffset) {
+        selectedDoor!.offsetFromWallStart = newOffset;
+
+        // Update connected door if exists
+        if (selectedDoor!.connectedDoor != null) {
+          CutOut? connectedCutout =
+              _findCutOutByDoor(selectedDoor!.connectedDoor!);
+          if (connectedCutout != null) {
+            double newConnectedOffset = _calculateAdjacentDoorOffsetForCutOut(
+                cutoutRoom, connectedCutout, selectedDoor!);
+            selectedDoor!.connectedDoor!.offsetFromWallStart =
+                newConnectedOffset;
+          }
+        }
+
+        // _saveState();
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Door moved");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid door position. Door must be at least ${minCornerDistance}ft from corners.");
+      }
     } else {
       Fluttertoast.showToast(
-          msg:
-              "Invalid door position. Door must be at least ${minCornerDistance}ft from corners.");
+          msg: "Could not find room or cutout for selected door");
+      return;
     }
   }
 
   // Helper method to find room by door
   Room? _findRoomByDoor(Door door) {
-    return _rooms.firstWhere((room) => room.doors.contains(door),
-        orElse: () => throw Exception("Room not found for door"));
+    try {
+      return _rooms.firstWhere((room) => room.doors.contains(door));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  CutOut? _findCutOutByDoor(Door door) {
+    try {
+      return _cutOuts.firstWhere((cutout) => cutout.doors.contains(door));
+    } catch (e) {
+      return null;
+    }
   }
 
   Room? _findRoomByName(String name) {
@@ -2250,6 +2330,7 @@ class FloorPlanController extends ChangeNotifier {
     Room? room = _findRoomByName(parentName);
     if (room != null) {
       try {
+        // Change: Use doorId instead of trying to find by name
         Door door = room.doors.firstWhere((d) => d.id == doorId);
         _selectDoorAndDeselect(door);
         return;
@@ -2268,17 +2349,6 @@ class FloorPlanController extends ChangeNotifier {
       _selectDoorAndDeselect(door);
     } catch (e) {
       Fluttertoast.showToast(msg: "Door not found");
-    }
-  }
-
-  // Update the _findCutOutByDoor method to handle the case when cutout is not found
-  CutOut? _findCutOutByDoor(Door door) {
-    try {
-      return _cutOuts.firstWhere(
-        (cutOut) => cutOut.doors.contains(door),
-      );
-    } catch (e) {
-      return null;
     }
   }
 
@@ -2382,7 +2452,7 @@ class FloorPlanController extends ChangeNotifier {
 
     String oppositeWall = _getOppositeWall(sourceWindow.wall);
     double adjacentOffset =
-        _calculateAdjacentOffset(sourceRoom, adjacentRoom, sourceWindow);
+        _calculateAdjacentOffsetForRoom(sourceRoom, adjacentRoom, sourceWindow);
 
     if (!adjacentRoom.canAddWindow(
         oppositeWall, adjacentOffset, sourceWindow.width)) {
@@ -2429,25 +2499,40 @@ class FloorPlanController extends ChangeNotifier {
   }
 
   void _selectWindowAndDeselect(Window window) {
-    // Deselect everything first
-    deselectAll();
-
-    // Find the parent (room or cutout) of the window
-    Room? parentRoom = _findRoomByWindow(window);
-    CutOut? parentCutOut = _findCutOutByWindow(window);
-
-    // Select the parent and the window
-    if (parentRoom != null) {
-      selectedRoom = parentRoom;
-      selectedRoomName = parentRoom.name;
-    } else if (parentCutOut != null) {
-      selectedCutOut = parentCutOut;
-      selectedCutOutName = parentCutOut.name;
+    // Clear highlight of previously selected room
+    if (selectedRoom != null) {
+      selectedRoom!.clearHighlight();
+      selectedRoom = null;
+      selectedRoomName = null;
     }
-
+    if (selectedCutOut != null) {
+      selectedCutOut!.clearHighlight();
+      selectedCutOut = null;
+      selectedCutOutName = null;
+    }
+    selectedStairs = null;
+    selectedDoor = null;
     selectedWindow = window;
     notifyListeners();
   }
+
+  // void _selectDoorAndDeselect(Door door) {
+  //   // Clear highlight of previously selected room
+  //   if (selectedRoom != null) {
+  //     selectedRoom!.clearHighlight();
+  //     selectedRoom = null;
+  //     selectedRoomName = null;
+  //   }
+  //   if (selectedCutOut != null) {
+  //     selectedCutOut!.clearHighlight();
+  //     selectedCutOut = null;
+  //     selectedCutOutName = null;
+  //   }
+  //   selectedStairs = null;
+  //   selectedWindow = null;
+  //   selectedDoor = door;
+  //   notifyListeners();
+  // }
 
   CutOut? _findCutOutByWindow(Window window) {
     try {
@@ -2507,62 +2592,109 @@ class FloorPlanController extends ChangeNotifier {
 
     // Find the room that contains the selected window
     Room? windowRoom = _findRoomByWindow(selectedWindow!);
-    if (windowRoom == null) {
+    CutOut? windowCutOut = _findCutOutByWindow(selectedWindow!);
+    if (windowRoom != null) {
+// Calculate wall length based on window's wall
+      double wallLength = (selectedWindow!.wall == "north" ||
+              selectedWindow!.wall == "south" ||
+              selectedWindow!.wall == "up" ||
+              selectedWindow!.wall == "down")
+          ? windowRoom.width
+          : windowRoom.height;
+
+      // Adjust window width for small rooms
+      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+
+      // Adjust minimum corner distance for small rooms
+      double minCornerDistance =
+          (wallLength < 6) ? 0.5 : Window.minDistanceFromCorner;
+
+      // Calculate valid range for window placement
+      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+      double minOffset = minCornerDistance;
+
+      if (newOffset >= minOffset && newOffset <= maxOffset) {
+        selectedWindow!.offsetFromWallStart = newOffset;
+
+        // Update connected window if exists
+        if (selectedWindow!.connectedWindow != null) {
+          Room? connectedRoom =
+              _findRoomByWindow(selectedWindow!.connectedWindow!);
+          if (connectedRoom != null) {
+            double newConnectedOffset = _calculateAdjacentOffsetForRoom(
+                windowRoom, connectedRoom, selectedWindow!);
+            selectedWindow!.connectedWindow!.offsetFromWallStart =
+                newConnectedOffset;
+          }
+        }
+
+        // _saveState();
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Window moved");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid window position. Window must be at least ${minCornerDistance}ft from corners.");
+      }
+    } else if (windowCutOut != null) {
+      // Calculate wall length based on window's wall
+      double wallLength = (selectedWindow!.wall == "north" ||
+              selectedWindow!.wall == "south" ||
+              selectedWindow!.wall == "up" ||
+              selectedWindow!.wall == "down")
+          ? windowCutOut.width
+          : windowCutOut.height;
+
+      // Adjust window width for small rooms
+      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+
+      // Adjust minimum corner distance for small rooms
+      double minCornerDistance =
+          (wallLength < 6) ? 0.5 : Window.minDistanceFromCorner;
+
+      // Calculate valid range for window placement
+      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+      double minOffset = minCornerDistance;
+
+      if (newOffset >= minOffset && newOffset <= maxOffset) {
+        selectedWindow!.offsetFromWallStart = newOffset;
+
+        // Update connected window if exists
+        if (selectedWindow!.connectedWindow != null) {
+          CutOut? connectedCutOut =
+              _findCutOutByWindow(selectedWindow!.connectedWindow!);
+          if (connectedCutOut != null) {
+            double newConnectedOffset = _calculateAdjacentOffsetForCutOut(
+                windowCutOut, connectedCutOut, selectedWindow!);
+            selectedWindow!.connectedWindow!.offsetFromWallStart =
+                newConnectedOffset;
+          }
+        }
+
+        // _saveState();
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Window moved");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid window position. Window must be at least ${minCornerDistance}ft from corners.");
+      }
+    } else {
       Fluttertoast.showToast(msg: "Could not find room for selected window");
       return;
-    }
-
-    // Calculate wall length based on window's wall
-    double wallLength = (selectedWindow!.wall == "north" ||
-            selectedWindow!.wall == "south" ||
-            selectedWindow!.wall == "up" ||
-            selectedWindow!.wall == "down")
-        ? windowRoom.width
-        : windowRoom.height;
-
-    // Adjust window width for small rooms
-    double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
-
-    // Adjust minimum corner distance for small rooms
-    double minCornerDistance =
-        (wallLength < 6) ? 0.5 : Window.minDistanceFromCorner;
-
-    // Calculate valid range for window placement
-    double maxOffset = wallLength - calculatedWidth - minCornerDistance;
-    double minOffset = minCornerDistance;
-
-    if (newOffset >= minOffset && newOffset <= maxOffset) {
-      selectedWindow!.offsetFromWallStart = newOffset;
-
-      // Update connected window if exists
-      if (selectedWindow!.connectedWindow != null) {
-        Room? connectedRoom =
-            _findRoomByWindow(selectedWindow!.connectedWindow!);
-        if (connectedRoom != null) {
-          double newConnectedOffset = _calculateAdjacentOffset(
-              windowRoom, connectedRoom, selectedWindow!);
-          selectedWindow!.connectedWindow!.offsetFromWallStart =
-              newConnectedOffset;
-        }
-      }
-
-      // _saveState();
-      notifyListeners();
-      Fluttertoast.showToast(msg: "Window moved");
-    } else {
-      Fluttertoast.showToast(
-          msg:
-              "Invalid window position. Window must be at least ${minCornerDistance}ft from corners.");
     }
   }
 
   // Helper method to find room by window (if not already defined)
   Room? _findRoomByWindow(Window window) {
-    return _rooms.firstWhere((room) => room.windows.contains(window),
-        orElse: () => throw Exception("Room not found for window"));
+    try {
+      return _rooms.firstWhere((room) => room.windows.contains(window));
+    } catch (e) {
+      return null;
+    }
   }
 
-  double _calculateAdjacentOffset(
+  double _calculateAdjacentOffsetForRoom(
       Room sourceRoom, Room adjacentRoom, Window sourceWindow) {
     // Get the dimensions of both rooms
     double sourceWallLength = (sourceWindow.wall == "north" ||
@@ -2578,6 +2710,31 @@ class FloorPlanController extends ChangeNotifier {
             sourceWindow.wall == "down")
         ? adjacentRoom.width
         : adjacentRoom.height;
+
+    // Calculate the relative position as a percentage of the wall length
+    double relativePosition =
+        sourceWindow.offsetFromWallStart / sourceWallLength;
+
+    // Apply the same relative position to the adjacent wall
+    return relativePosition * adjacentWallLength;
+  }
+
+  double _calculateAdjacentOffsetForCutOut(
+      CutOut sourceCutOut, CutOut adjacentCutOut, Window sourceWindow) {
+    // Get the dimensions of both rooms
+    double sourceWallLength = (sourceWindow.wall == "north" ||
+            sourceWindow.wall == "south" ||
+            sourceWindow.wall == "up" ||
+            sourceWindow.wall == "down")
+        ? sourceCutOut.width
+        : sourceCutOut.height;
+
+    double adjacentWallLength = (sourceWindow.wall == "north" ||
+            sourceWindow.wall == "south" ||
+            sourceWindow.wall == "up" ||
+            sourceWindow.wall == "down")
+        ? adjacentCutOut.width
+        : adjacentCutOut.height;
 
     // Calculate the relative position as a percentage of the wall length
     double relativePosition =
@@ -2726,6 +2883,35 @@ class FloorPlanController extends ChangeNotifier {
     selectedWindow = null;
     notifyListeners();
     Fluttertoast.showToast(msg: "Window removed from ${windowRoom.name}");
+  }
+
+  void removeSelectedSpace() {
+    if (selectedSpace == null) {
+      Fluttertoast.showToast(msg: "No space selected");
+      return;
+    }
+
+    // Try to find the space in rooms first
+    Room? spaceRoom = _findRoomBySpace(selectedSpace!);
+    if (spaceRoom != null) {
+      spaceRoom.spaces.remove(selectedSpace!);
+      selectedSpace = null;
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Space removed from room");
+      return;
+    }
+
+    // If not in rooms, try cutouts
+    CutOut? spaceCutOut = _findCutOutBySpace(selectedSpace!);
+    if (spaceCutOut != null) {
+      spaceCutOut.spaces.remove(selectedSpace!);
+      selectedSpace = null;
+      notifyListeners();
+      Fluttertoast.showToast(msg: "Space removed from cutout");
+      return;
+    }
+
+    Fluttertoast.showToast(msg: "Could not find parent for selected space");
   }
 
   // void undo() {
@@ -3436,35 +3622,155 @@ class FloorPlanController extends ChangeNotifier {
   }
 
   // Space Movement
+  // void moveSpace(double newOffset) {
+  //   if (selectedSpace == null) {
+  //     Fluttertoast.showToast(msg: "No space selected");
+  //     return;
+  //   }
+
+  //   // Find parent (room or cutout) of the selected space
+  //   dynamic parent = _findSpaceParent(selectedSpace!);
+  //   if (parent == null) {
+  //     Fluttertoast.showToast(msg: "Could not find parent for selected space");
+  //     return;
+  //   }
+
+  //   // Check if new position is valid
+  //   if (!parent.canAddSpace(
+  //       selectedSpace!.wall, newOffset, selectedSpace!.width)) {
+  //     Fluttertoast.showToast(msg: "Cannot move space to this position");
+  //     return;
+  //   }
+
+  //   // Move the space
+  //   selectedSpace!.offsetFromWallStart = newOffset;
+
+  //   // If this space is connected to another space, update the connection
+  //   if (selectedSpace!.connectedSpace != null) {
+  //     _updateConnectedSpacePosition(selectedSpace!, newOffset);
+  //   }
+
+  //   notifyListeners();
+  // }
+
+  Room? _findRoomBySpace(Space space) {
+    try {
+      return _rooms.firstWhere((room) => room.spaces.contains(space));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  CutOut? _findCutOutBySpace(Space space) {
+    try {
+      return _cutOuts.firstWhere((cutOut) => cutOut.spaces.contains(space));
+    } catch (e) {
+      return null;
+    }
+  }
+
   void moveSpace(double newOffset) {
     if (selectedSpace == null) {
-      Fluttertoast.showToast(msg: "No space selected");
+      Fluttertoast.showToast(msg: "No door selected");
       return;
     }
 
-    // Find parent (room or cutout) of the selected space
-    dynamic parent = _findSpaceParent(selectedSpace!);
-    if (parent == null) {
-      Fluttertoast.showToast(msg: "Could not find parent for selected space");
+    // Find the room that contains the selected door
+    Room? spaceRoom = _findRoomBySpace(selectedSpace!);
+    CutOut? spaceCutOut = _findCutOutBySpace(selectedSpace!);
+    if (spaceRoom != null) {
+      // Calculate wall length based on door's wall
+      double wallLength = (selectedSpace!.wall == "north" ||
+              selectedSpace!.wall == "south" ||
+              selectedSpace!.wall == "up" ||
+              selectedSpace!.wall == "down")
+          ? spaceRoom.width
+          : spaceRoom.height;
+
+      // Adjust door width for small rooms
+      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+
+      // Adjust minimum corner distance for small rooms
+      double minCornerDistance =
+          (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
+
+      // Calculate valid range for door placement
+      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+      double minOffset = minCornerDistance;
+
+      if (newOffset >= minOffset && newOffset <= maxOffset) {
+        selectedSpace!.offsetFromWallStart = newOffset;
+
+        // TODO: Implement this if needed.
+        // Update connected door if exists
+        // if (selectedSpace!.connectedSpace != null) {
+        //   Room? connectedRoom =
+        //       _findRoomBySpace(selectedSpace!.connectedSpace!);
+        //   if (connectedRoom != null) {
+        //     double newConnectedOffset = _calculateAdjacentSpaceOffsetForRoom(
+        //         spaceRoom, connectedRoom, selectedSpace!);
+        //     selectedSpace!.connectedSpace!.offsetFromWallStart =
+        //         newConnectedOffset;
+        //   }
+        // }
+
+        // _saveState();
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Space moved");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid space position. Space must be at least ${minCornerDistance}ft from corners.");
+      }
+    } else if (spaceCutOut != null) {
+      // Calculate wall length based on door's wall
+      double wallLength = (selectedSpace!.wall == "north" ||
+              selectedSpace!.wall == "south" ||
+              selectedSpace!.wall == "up" ||
+              selectedSpace!.wall == "down")
+          ? spaceCutOut.width
+          : spaceCutOut.height;
+
+      // Adjust door width for small rooms
+      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+
+      // Adjust minimum corner distance for small rooms
+      double minCornerDistance =
+          (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
+
+      // Calculate valid range for door placement
+      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
+      double minOffset = minCornerDistance;
+
+      if (newOffset >= minOffset && newOffset <= maxOffset) {
+        selectedSpace!.offsetFromWallStart = newOffset;
+
+        // TODO: Implement this if needed.
+        // Update connected door if exists
+        // if (selectedSpace!.connectedSpace != null) {
+        //   CutOut? connectedCutout =
+        //       _findCutOutBySpace(selectedSpace!.connectedSpace!);
+        //   if (connectedCutout != null) {
+        //     double newConnectedOffset = _calculateAdjacentOffsetForCutOut(
+        //         spaceCutOut, connectedCutout, selectedSpace!);
+        //     selectedSpace!.connectedSpace!.offsetFromWallStart =
+        //         newConnectedOffset;
+        //   }
+        // }
+
+        // _saveState();
+        notifyListeners();
+        Fluttertoast.showToast(msg: "Space moved");
+      } else {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid space position. Space must be at least ${minCornerDistance}ft from corners.");
+      }
+    } else {
+      Fluttertoast.showToast(
+          msg: "Could not find room or cutout for selected space");
       return;
     }
-
-    // Check if new position is valid
-    if (!parent.canAddSpace(
-        selectedSpace!.wall, newOffset, selectedSpace!.width)) {
-      Fluttertoast.showToast(msg: "Cannot move space to this position");
-      return;
-    }
-
-    // Move the space
-    selectedSpace!.offsetFromWallStart = newOffset;
-
-    // If this space is connected to another space, update the connection
-    if (selectedSpace!.connectedSpace != null) {
-      _updateConnectedSpacePosition(selectedSpace!, newOffset);
-    }
-
-    notifyListeners();
   }
 
   // Space Removal

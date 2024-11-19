@@ -80,7 +80,9 @@ class CommandController {
 
     print("Recognized command: $command"); // Debug print
 
-    if (tokens.contains("select") && tokens.contains("cutout")) {
+    if (tokens.contains("select") &&
+        (tokens.contains("cutout") ||
+            tokens.contains("cut") && tokens.contains("out"))) {
       _handleSelectCutOutCommand(tokens);
       return;
     }
@@ -106,7 +108,12 @@ class CommandController {
       _handleShowCommand(tokens);
       return;
     } else if (tokens.contains("door") || tokens.contains("doors")) {
+      print("remove door");
       _handleDoorCommand(command, tokens);
+      return;
+    } else if (tokens.contains("space") || tokens.contains("spaces")) {
+      print("0");
+      _handleSpaceCommand(command, tokens);
       return;
     }
     // Add window command handling
@@ -126,24 +133,25 @@ class CommandController {
         _handleSelectCommand(tokens);
         return;
       }
-    } else if (tokens.contains("deselect")) {
-      if (tokens.contains("door")) {
-        floorPlanController?.deselectDoor();
-        return;
-      } else if (tokens.contains("room")) {
-        selectedRoom = null;
-        floorPlanController?.deselectRoom();
-        return;
-      } else if (tokens.contains("stairs")) {
-        floorPlanController?.deselectStairs();
-        return;
-      } else {
-        // Deselect everything
-        selectedRoom = null;
-        floorPlanController?.deselectRoom(); // This will also deselect door
-        floorPlanController?.deselectStairs();
-        return;
-      }
+    } else if (tokens.contains("deselect") || tokens.contains("unselect")) {
+      // if (tokens.contains("door")) {
+      //   floorPlanController?.deselectDoor();
+      //   return;
+      // } else if (tokens.contains("room")) {
+      //   selectedRoom = null;
+      //   floorPlanController?.deselectRoom();
+      //   return;
+      // } else if (tokens.contains("stairs")) {
+      //   floorPlanController?.deselectStairs();
+      //   return;
+      // } else {
+      //   // Deselect everything
+      //   selectedRoom = null;
+      //   floorPlanController?.deselectRoom(); // This will also deselect door
+      //   floorPlanController?.deselectStairs();
+      //   return;
+      // }
+      floorPlanController?.deselectAll();
     } else if (tokens.contains("rename")) {
       _handleRenameCommand(tokens);
       return;
@@ -168,21 +176,9 @@ class CommandController {
       _handleZoomCommand(tokens);
       return;
     } else if ((tokens.contains("add") || tokens.contains("create")) &&
-        tokens.contains("cutout")) {
+        (tokens.contains("cutout") ||
+            (tokens.contains("cut") || tokens.contains("out")))) {
       _handleAddCutOutCommand(command, tokens);
-      return;
-    } else if (tokens.contains("add") && tokens.contains("space")) {
-      _handleAddSpaceCommand(tokens);
-      return;
-    } else if (tokens.contains("select") && tokens.contains("space")) {
-      _handleSelectSpaceCommand(tokens);
-      return;
-    } else if (tokens.contains("move") && tokens.contains("space")) {
-      _handleMoveSpaceCommand(tokens);
-      return;
-    } else if ((tokens.contains("remove") || tokens.contains("delete")) &&
-        tokens.contains("space")) {
-      _handleRemoveSpaceCommand(tokens);
       return;
     } else {
       Fluttertoast.showToast(msg: "Invalid Command: $command");
@@ -253,6 +249,17 @@ class CommandController {
       return;
     }
 
+    if (tokens.contains("space")) {
+      if (floorPlanController?.selectedSpace == null) {
+        MessageService.showMessage(
+            floorManagerController.context, "Please select a space first",
+            type: MessageType.error);
+        return;
+      }
+      floorPlanController?.removeSelectedSpace();
+      return;
+    }
+
     // Handle other remove commands (rooms, base, etc.)
     if (tokens.contains("base")) {
       floorPlanController?.removeBase();
@@ -277,6 +284,12 @@ class CommandController {
         return;
       }
       floorPlanController?.removeSelectedRoom();
+      return;
+    }
+
+    if (tokens.contains("cutout") ||
+        (tokens.contains("cut") && tokens.contains("out"))) {
+      floorPlanController?.removeSelectedCutOut();
       return;
     }
   }
@@ -1423,6 +1436,30 @@ class CommandController {
     }
   }
 
+  void _handleSpaceCommand(String command, List<String> tokens) {
+    // First, handle door selection
+    if (tokens.contains("select")) {
+      _handleSelectSpaceCommand(tokens);
+      return;
+    }
+
+    // Handle other door commands
+    if (tokens.contains("add")) {
+      _handleAddSpaceCommand(tokens);
+    } else if (tokens.contains("move")) {
+      _handleMoveSpaceCommand(tokens);
+    } else if (tokens.contains("remove") || tokens.contains("delete")) {
+      print("1");
+      _handleRemoveSpaceCommand(tokens);
+    } else {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Invalid space command",
+        type: MessageType.error,
+      );
+    }
+  }
+
   // Add new method for door selection
   void _handleSelectDoorCommand(List<String> tokens) {
     String? parentName;
@@ -1659,14 +1696,8 @@ class CommandController {
   }
 
   void _handleWindowCommand(String command, List<String> tokens) {
-    // Check if a room or cutout is selected
-    if (floorPlanController?.selectedRoom == null &&
-        floorPlanController?.selectedCutOut == null) {
-      MessageService.showMessage(
-        floorManagerController.context,
-        "Please select a room or cutout first",
-        type: MessageType.error,
-      );
+    if (tokens.contains("select")) {
+      _handleSelectWindowCommand(tokens);
       return;
     }
 
@@ -1676,8 +1707,6 @@ class CommandController {
       _handleRemoveWindowCommand(tokens);
     } else if (tokens.contains("move")) {
       _handleMoveWindowCommand(tokens);
-    } else if (tokens.contains("select")) {
-      _handleSelectWindowCommand(tokens);
     } else {
       MessageService.showMessage(
         floorManagerController.context,
@@ -1853,6 +1882,10 @@ class CommandController {
       if (tokens[i] == "cutout" && i + 1 < tokens.length) {
         cutOutName = tokens[i + 1];
         break;
+      } else if ((tokens[i] == "cut" && tokens[i + 1] == "out") &&
+          i + 2 < tokens.length) {
+        cutOutName = tokens[i + 2];
+        break;
       }
     }
 
@@ -1983,27 +2016,38 @@ class CommandController {
     floorPlanController?.moveSpace(newOffset);
   }
 
+  // void _handleRemoveSpaceCommand(List<String> tokens) {
+  //   if (floorPlanController?.selectedSpace == null) {
+  //     MessageService.showMessage(
+  //       floorManagerController.context,
+  //       "Please select a space first",
+  //       type: MessageType.error,
+  //     );
+  //     return;
+  //   }
+
+  //   // Find parent (room or cutout) of selected space
+  //   if (floorPlanController?.selectedRoom != null) {
+  //     floorPlanController?.removeSpace(
+  //       floorPlanController!.selectedRoom!.name,
+  //       floorPlanController!.selectedSpace!.id,
+  //     );
+  //   } else if (floorPlanController?.selectedCutOut != null) {
+  //     floorPlanController?.removeSpace(
+  //       floorPlanController!.selectedCutOut!.name,
+  //       floorPlanController!.selectedSpace!.id,
+  //     );
+  //   }
+  // }
+
   void _handleRemoveSpaceCommand(List<String> tokens) {
     if (floorPlanController?.selectedSpace == null) {
       MessageService.showMessage(
-        floorManagerController.context,
-        "Please select a space first",
-        type: MessageType.error,
-      );
+          floorManagerController.context, "Please select a door first",
+          type: MessageType.error);
       return;
     }
 
-    // Find parent (room or cutout) of selected space
-    if (floorPlanController?.selectedRoom != null) {
-      floorPlanController?.removeSpace(
-        floorPlanController!.selectedRoom!.name,
-        floorPlanController!.selectedSpace!.id,
-      );
-    } else if (floorPlanController?.selectedCutOut != null) {
-      floorPlanController?.removeSpace(
-        floorPlanController!.selectedCutOut!.name,
-        floorPlanController!.selectedSpace!.id,
-      );
-    }
+    floorPlanController?.removeSelectedSpace();
   }
 }

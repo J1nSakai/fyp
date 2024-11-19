@@ -214,10 +214,15 @@ class EntityInfoPanel extends StatelessWidget {
         InfoSection(
           title: 'Door Properties',
           children: [
-            InfoRow(label: 'Name', value: "door ${door.id.split(':').last}"),
+            InfoRow(label: 'Name', value: "Door ${door.id.split(':').last}"),
             InfoRow(label: 'Wall', value: door.wall),
-            InfoRow(label: 'Width', value: '${door.width}ft'),
-            InfoRow(label: 'Offset', value: '${door.offsetFromWallStart}ft'),
+            InfoRow(
+                label: 'Width',
+                value: '${double.parse(door.width.toStringAsFixed(2))}ft'),
+            InfoRow(
+                label: 'Offset',
+                value:
+                    '${double.parse(door.offsetFromWallStart.toStringAsFixed(2))}ft'),
             InfoRow(
                 label: 'Swing', value: door.swingInward ? "Inward" : "Outward"),
             InfoRow(label: 'Opens', value: door.openLeft ? "Left" : "Right"),
@@ -256,8 +261,12 @@ class EntityInfoPanel extends StatelessWidget {
                 label: 'Name',
                 value:
                     '${stairs.name[0].toUpperCase()}${stairs.name.substring(1)}'),
-            InfoRow(label: 'Width', value: '${stairs.width}ft'),
-            InfoRow(label: 'Length', value: '${stairs.length}ft'),
+            InfoRow(
+                label: 'Width',
+                value: '${double.parse(stairs.width.toStringAsFixed(2))}ft'),
+            InfoRow(
+                label: 'Length',
+                value: '${double.parse(stairs.length.toStringAsFixed(2))}ft'),
             InfoRow(
               label: 'Position',
               value: '(${stairs.position.dx}ft, ${stairs.position.dy}ft)',
@@ -281,10 +290,15 @@ class EntityInfoPanel extends StatelessWidget {
           title: 'Window Properties',
           children: [
             InfoRow(
-                label: 'Name', value: "window ${window.id.split(':').last}"),
+                label: 'Name', value: "Window ${window.id.split(':').last}"),
             InfoRow(label: 'Wall', value: window.wall),
-            InfoRow(label: 'Width', value: '${window.width}ft'),
-            InfoRow(label: 'Offset', value: '${window.offsetFromWallStart}ft'),
+            InfoRow(
+                label: 'Width',
+                value: '${double.parse(window.width.toStringAsFixed(2))}ft'),
+            InfoRow(
+                label: 'Offset',
+                value:
+                    '${double.parse(window.offsetFromWallStart.toStringAsFixed(2))}ft'),
             if (window.connectedWindow != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -321,8 +335,12 @@ class EntityInfoPanel extends StatelessWidget {
                 label: 'Name',
                 value:
                     '${cutOut.name[0].toUpperCase()}${cutOut.name.substring(1)}'),
-            InfoRow(label: 'Width', value: '${cutOut.width}ft'),
-            InfoRow(label: 'Height', value: '${cutOut.height}ft'),
+            InfoRow(
+                label: 'Width',
+                value: '${double.parse(cutOut.width.toStringAsFixed(2))}ft'),
+            InfoRow(
+                label: 'Height',
+                value: '${double.parse(cutOut.height.toStringAsFixed(2))}ft'),
             InfoRow(
               label: 'Position',
               value: '(${cutOut.position.dx}ft, ${cutOut.position.dy}ft)',
@@ -368,10 +386,15 @@ class EntityInfoPanel extends StatelessWidget {
         InfoSection(
           title: 'Space Properties',
           children: [
-            InfoRow(label: 'Name', value: "space ${space.id.split(':').last}"),
+            InfoRow(label: 'Name', value: "Space ${space.id.split(':').last}"),
             InfoRow(label: 'Wall', value: space.wall),
-            InfoRow(label: 'Width', value: '${space.width}ft'),
-            InfoRow(label: 'Offset', value: '${space.offsetFromWallStart}ft'),
+            InfoRow(
+                label: 'Width',
+                value: '${double.parse(space.width.toStringAsFixed(2))}ft'),
+            InfoRow(
+                label: 'Offset',
+                value:
+                    '${double.parse(space.offsetFromWallStart.toStringAsFixed(2))}ft'),
             if (space.connectedSpace != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),

@@ -10,9 +10,9 @@ class Room {
   String name;
   Paint roomPaint;
   bool hasHiddenWalls = false;
-  final List<Door> doors = [];
-  final List<Window> windows = [];
-  final List<Space> spaces = [];
+  List<Door> doors = [];
+  List<Window> windows = [];
+  List<Space> spaces = [];
   int _doorCounter = 0;
   int _windowCounter = 0;
   int _spaceCounter = 0;
@@ -32,7 +32,7 @@ class Room {
 
   String getNextDoorId() {
     _doorCounter++;
-    return "$name:$_doorCounter";
+    return "$name:d:$_doorCounter";
   }
 
   String getNextWindowId() {
