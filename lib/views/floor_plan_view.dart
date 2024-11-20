@@ -566,23 +566,29 @@ class FloorPlanPainter extends CustomPainter {
       final roomRight = roomLeft + (room.width * scaleFactor);
       final roomBottom = roomTop + (room.height * scaleFactor);
 
-      // Calculate door length based on room dimensions
+      // Calculate door length
       double doorLength;
-      switch (door.wall) {
-        case "north":
-        case "south":
-        case "up":
-        case "down":
-          doorLength = (room.width * scaleFactor) / 3; // 1/3 of room width
-          break;
-        case "east":
-        case "west":
-        case "left":
-        case "right":
-          doorLength = (room.height * scaleFactor) / 3; // 1/3 of room height
-          break;
-        default:
-          doorLength = Door.defaultWidth * scaleFactor;
+      if (door.width != Door.defaultWidth) {
+        // If door has been resized, use its actual width
+        doorLength = door.width * scaleFactor;
+      } else {
+        // Use the default 1/3 calculation for unmodified doors
+        switch (door.wall) {
+          case "north":
+          case "south":
+          case "up":
+          case "down":
+            doorLength = (room.width * scaleFactor) / 3;
+            break;
+          case "east":
+          case "west":
+          case "left":
+          case "right":
+            doorLength = (room.height * scaleFactor) / 3;
+            break;
+          default:
+            doorLength = Door.defaultWidth * scaleFactor;
+        }
       }
 
       // Calculate door position and dimensions
@@ -732,21 +738,27 @@ class FloorPlanPainter extends CustomPainter {
 
       // Calculate window length (1/3 of wall length)
       double windowLength;
-      switch (window.wall) {
-        case "north":
-        case "south":
-        case "up":
-        case "down":
-          windowLength = (room.width * scaleFactor) / 3;
-          break;
-        case "east":
-        case "west":
-        case "left":
-        case "right":
-          windowLength = (room.height * scaleFactor) / 3;
-          break;
-        default:
-          windowLength = Window.defaultWidth * scaleFactor;
+      if (window.width != Window.defaultWidth) {
+        // If window has been resized, use its actual width
+        windowLength = window.width * scaleFactor;
+      } else {
+        // Use the default calculation for unmodified windows
+        switch (window.wall) {
+          case "north":
+          case "south":
+          case "up":
+          case "down":
+            windowLength = (room.width * scaleFactor) / 3;
+            break;
+          case "east":
+          case "west":
+          case "left":
+          case "right":
+            windowLength = (room.height * scaleFactor) / 3;
+            break;
+          default:
+            windowLength = Window.defaultWidth * scaleFactor;
+        }
       }
 
       // Calculate window frame points
@@ -861,7 +873,31 @@ class FloorPlanPainter extends CustomPainter {
     final bottom = top + heightInPixels;
 
     for (Space space in parent.spaces) {
-      final spaceLength = space.width * adjustedScaleFactor;
+      // Calculate space length based on whether it's been resized or not
+      double spaceLength;
+      if (space.width != Space.defaultWidth) {
+        // If space has been resized, use its actual width
+        spaceLength = space.width * adjustedScaleFactor;
+      } else {
+        // Use the default calculation for unmodified spaces
+        switch (space.wall) {
+          case "north":
+          case "south":
+          case "up":
+          case "down":
+            spaceLength = widthInPixels / 3; // 1/3 of parent width
+            break;
+          case "east":
+          case "west":
+          case "left":
+          case "right":
+            spaceLength = heightInPixels / 3; // 1/3 of parent height
+            break;
+          default:
+            spaceLength = Space.defaultWidth * adjustedScaleFactor;
+        }
+      }
+
       double spaceStart;
       Offset gapStart;
       Offset gapEnd;
@@ -869,8 +905,12 @@ class FloorPlanPainter extends CustomPainter {
       const frameThickness = 3.0;
 
       final spacePaint = Paint()
-        ..color = space.isHighlighted ? Colors.red : Colors.white
-        ..strokeWidth = 2.5
+        ..color = space == selectedSpace
+            ? (isDarkMode ? Colors.yellowAccent : Colors.yellow)
+            : (space.isHighlighted
+                ? Colors.red
+                : (isDarkMode ? const Color(0x001a1b26) : Colors.white70))
+        ..strokeWidth = 3
         ..style = PaintingStyle.stroke;
 
       switch (space.wall) {
@@ -947,7 +987,7 @@ class FloorPlanPainter extends CustomPainter {
           (gapStart.dy + gapEnd.dy) / 2,
         );
         final connectingDotPaint = Paint()
-          ..color = Colors.black
+          ..color = isDarkMode ? const Color(0x001a1b26) : Colors.white70
           ..style = PaintingStyle.fill;
         canvas.drawCircle(centerStart, 2, connectingDotPaint);
       }
@@ -974,23 +1014,29 @@ class FloorPlanPainter extends CustomPainter {
       final cutOutRight = cutOutLeft + (cutOut.width * scaleFactor);
       final cutOutBottom = cutOutTop + (cutOut.height * scaleFactor);
 
-      // Calculate door length based on room dimensions
+      // Calculate door length
       double doorLength;
-      switch (door.wall) {
-        case "north":
-        case "south":
-        case "up":
-        case "down":
-          doorLength = (cutOut.width * scaleFactor) / 3; // 1/3 of room width
-          break;
-        case "east":
-        case "west":
-        case "left":
-        case "right":
-          doorLength = (cutOut.height * scaleFactor) / 3; // 1/3 of room height
-          break;
-        default:
-          doorLength = Door.defaultWidth * scaleFactor;
+      if (door.width != Door.defaultWidth) {
+        // If door has been resized, use its actual width
+        doorLength = door.width * scaleFactor;
+      } else {
+        // Use the default 1/3 calculation for unmodified doors
+        switch (door.wall) {
+          case "north":
+          case "south":
+          case "up":
+          case "down":
+            doorLength = (cutOut.width * scaleFactor) / 3;
+            break;
+          case "east":
+          case "west":
+          case "left":
+          case "right":
+            doorLength = (cutOut.height * scaleFactor) / 3;
+            break;
+          default:
+            doorLength = Door.defaultWidth * scaleFactor;
+        }
       }
 
       // Calculate door position and dimensions
@@ -1145,21 +1191,27 @@ class FloorPlanPainter extends CustomPainter {
 
       // Calculate window length (1/3 of wall length)
       double windowLength;
-      switch (window.wall) {
-        case "north":
-        case "south":
-        case "up":
-        case "down":
-          windowLength = (cutOut.width * scaleFactor) / 3;
-          break;
-        case "east":
-        case "west":
-        case "left":
-        case "right":
-          windowLength = (cutOut.height * scaleFactor) / 3;
-          break;
-        default:
-          windowLength = Window.defaultWidth * scaleFactor;
+      if (window.width != Window.defaultWidth) {
+        // If window has been resized, use its actual width
+        windowLength = window.width * scaleFactor;
+      } else {
+        // Use the default calculation for unmodified windows
+        switch (window.wall) {
+          case "north":
+          case "south":
+          case "up":
+          case "down":
+            windowLength = (cutOut.width * scaleFactor) / 3;
+            break;
+          case "east":
+          case "west":
+          case "left":
+          case "right":
+            windowLength = (cutOut.height * scaleFactor) / 3;
+            break;
+          default:
+            windowLength = Window.defaultWidth * scaleFactor;
+        }
       }
 
       // Calculate window frame points

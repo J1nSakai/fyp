@@ -87,6 +87,21 @@ class CommandController {
       return;
     }
 
+    if (tokens.contains("door") || tokens.contains("doors")) {
+      print("remove door");
+      _handleDoorCommand(command, tokens);
+      return;
+    } else if (tokens.contains("space") || tokens.contains("spaces")) {
+      print("0");
+      _handleSpaceCommand(command, tokens);
+      return;
+    }
+    // Add window command handling
+    else if (tokens.contains("window") || tokens.contains("windows")) {
+      _handleWindowCommand(command, tokens);
+      return;
+    }
+
     if (tokens.contains("resize") ||
         tokens.contains("change") ||
         (tokens.contains("increase") &&
@@ -106,19 +121,6 @@ class CommandController {
       return;
     } else if (tokens.contains("show")) {
       _handleShowCommand(tokens);
-      return;
-    } else if (tokens.contains("door") || tokens.contains("doors")) {
-      print("remove door");
-      _handleDoorCommand(command, tokens);
-      return;
-    } else if (tokens.contains("space") || tokens.contains("spaces")) {
-      print("0");
-      _handleSpaceCommand(command, tokens);
-      return;
-    }
-    // Add window command handling
-    else if (tokens.contains("window") || tokens.contains("windows")) {
-      _handleWindowCommand(command, tokens);
       return;
     }
     // Handle base creation commands
@@ -1427,6 +1429,8 @@ class CommandController {
       _handleRemoveDoorCommand(tokens);
     } else if (tokens.contains("opens")) {
       _handleDoorOpeningDirectionCommand(tokens);
+    } else if (tokens.contains("resize")) {
+      _handleResizeDoorCommand(tokens);
     } else {
       MessageService.showMessage(
         floorManagerController.context,
@@ -1449,8 +1453,9 @@ class CommandController {
     } else if (tokens.contains("move")) {
       _handleMoveSpaceCommand(tokens);
     } else if (tokens.contains("remove") || tokens.contains("delete")) {
-      print("1");
       _handleRemoveSpaceCommand(tokens);
+    } else if (tokens.contains("resize")) {
+      _handleResizeSpaceCommand(tokens);
     } else {
       MessageService.showMessage(
         floorManagerController.context,
@@ -1707,6 +1712,8 @@ class CommandController {
       _handleRemoveWindowCommand(tokens);
     } else if (tokens.contains("move")) {
       _handleMoveWindowCommand(tokens);
+    } else if (tokens.contains("resize")) {
+      _handleResizeWindowCommand(tokens);
     } else {
       MessageService.showMessage(
         floorManagerController.context,
@@ -2049,5 +2056,110 @@ class CommandController {
     }
 
     floorPlanController?.removeSelectedSpace();
+  }
+
+  void _handleResizeDoorCommand(List<String> tokens) {
+    if (floorPlanController?.selectedDoor == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a door first",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    // Extract new width
+    double? newWidth;
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        try {
+          newWidth = double.parse(tokens[toIndex + 1]);
+        } catch (e) {
+          // Handle parsing error
+        }
+      }
+    }
+
+    if (newWidth == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify the new width (e.g., 'resize door to 3')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    floorPlanController?.resizeDoor(newWidth);
+  }
+
+  void _handleResizeWindowCommand(List<String> tokens) {
+    if (floorPlanController?.selectedWindow == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a window first",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    // Extract new width
+    double? newWidth;
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        try {
+          newWidth = double.parse(tokens[toIndex + 1]);
+        } catch (e) {
+          // Handle parsing error
+        }
+      }
+    }
+
+    if (newWidth == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify the new width (e.g., 'resize window to 3')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    floorPlanController?.resizeWindow(newWidth);
+  }
+
+  void _handleResizeSpaceCommand(List<String> tokens) {
+    if (floorPlanController?.selectedSpace == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please select a space first",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    // Extract new width
+    double? newWidth;
+    if (tokens.contains("to")) {
+      int toIndex = tokens.indexOf("to");
+      if (toIndex + 1 < tokens.length) {
+        try {
+          newWidth = double.parse(tokens[toIndex + 1]);
+        } catch (e) {
+          // Handle parsing error
+        }
+      }
+    }
+
+    if (newWidth == null) {
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Please specify the new width (e.g., 'resize space to 3')",
+        type: MessageType.error,
+      );
+      return;
+    }
+
+    floorPlanController?.resizeSpace(newWidth);
   }
 }

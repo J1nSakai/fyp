@@ -70,6 +70,57 @@ class CutOut {
     return true;
   }
 
+  bool canResizeDoor(String wall, double offset, double width,
+      {Door? excludeDoor}) {
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? this.width
+            : height;
+    if (offset < Door.minDistanceFromCorner ||
+        offset + width > wallLength - Door.minDistanceFromCorner) {
+      return false;
+    }
+
+    for (Door existingDoor in doors) {
+      // Skip checking against the door we're resizing
+      if (excludeDoor != null && existingDoor.id == excludeDoor.id) {
+        continue;
+      }
+
+      if (existingDoor.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingDoor.offsetFromWallStart,
+            existingDoor.width, Door.minDistanceBetweenDoors)) {
+          return false;
+        }
+      }
+    }
+
+    // Rest of the checks remain the same
+    for (Window existingWindow in windows) {
+      if (existingWindow.wall == wall) {
+        if (_doElementsOverlap(
+            offset,
+            width,
+            existingWindow.offsetFromWallStart,
+            existingWindow.width,
+            Door.minDistanceFromWindows)) {
+          return false;
+        }
+      }
+    }
+
+    for (Space existingSpace in spaces) {
+      if (existingSpace.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingSpace.offsetFromWallStart,
+            existingSpace.width, Space.minDistanceFromDoors)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
   bool canAddWindow(String wall, double offset, double width) {
     // Check overlap with existing windows
     for (Window existingWindow in windows) {
@@ -100,6 +151,106 @@ class CutOut {
       if (space.wall == wall) {
         if (_doElementsOverlap(offset, width, space.offsetFromWallStart,
             space.width, Space.minDistanceFromWindows)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  bool canResizeWindow(String wall, double offset, double width,
+      {Window? excludeWindow}) {
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? this.width
+            : height;
+    if (offset < Window.minDistanceFromCorner ||
+        offset + width > wallLength - Window.minDistanceFromCorner) {
+      return false;
+    }
+
+    for (Window existingWindow in windows) {
+      // Skip checking against the window we're resizing
+      if (excludeWindow != null && existingWindow.id == excludeWindow.id) {
+        continue;
+      }
+
+      if (existingWindow.wall == wall) {
+        if (_doElementsOverlap(
+            offset,
+            width,
+            existingWindow.offsetFromWallStart,
+            existingWindow.width,
+            Window.minDistanceBetweenWindows)) {
+          return false;
+        }
+      }
+    }
+
+    for (Door existingDoor in doors) {
+      if (existingDoor.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingDoor.offsetFromWallStart,
+            existingDoor.width, Window.minDistanceFromDoors)) {
+          return false;
+        }
+      }
+    }
+
+    for (Space existingSpace in spaces) {
+      if (existingSpace.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingSpace.offsetFromWallStart,
+            existingSpace.width, Space.minDistanceFromWindows)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  bool canResizeSpace(String wall, double offset, double width,
+      {Space? excludeSpace}) {
+    double wallLength =
+        (wall == "north" || wall == "south" || wall == "up" || wall == "down")
+            ? this.width
+            : height;
+    if (offset < Space.minDistanceFromCorner ||
+        offset + width > wallLength - Space.minDistanceFromCorner) {
+      return false;
+    }
+
+    for (Space existingSpace in spaces) {
+      // Skip checking against the space we're resizing
+      if (excludeSpace != null && existingSpace.id == excludeSpace.id) {
+        continue;
+      }
+
+      if (existingSpace.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingSpace.offsetFromWallStart,
+            existingSpace.width, Space.minDistanceBetweenSpaces)) {
+          return false;
+        }
+      }
+    }
+
+    for (Door existingDoor in doors) {
+      if (existingDoor.wall == wall) {
+        if (_doElementsOverlap(offset, width, existingDoor.offsetFromWallStart,
+            existingDoor.width, Space.minDistanceFromDoors)) {
+          return false;
+        }
+      }
+    }
+
+    for (Window existingWindow in windows) {
+      if (existingWindow.wall == wall) {
+        if (_doElementsOverlap(
+            offset,
+            width,
+            existingWindow.offsetFromWallStart,
+            existingWindow.width,
+            Space.minDistanceFromWindows)) {
           return false;
         }
       }

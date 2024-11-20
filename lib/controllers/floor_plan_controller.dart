@@ -3773,39 +3773,6 @@ class FloorPlanController extends ChangeNotifier {
     }
   }
 
-  // Space Removal
-
-  // Space Resizing
-  void resizeSpace(double newWidth) {
-    if (selectedSpace == null) {
-      Fluttertoast.showToast(msg: "No space selected");
-      return;
-    }
-
-    dynamic parent = _findSpaceParent(selectedSpace!);
-    if (parent == null) {
-      Fluttertoast.showToast(msg: "Could not find parent for selected space");
-      return;
-    }
-
-    // Check if new size is valid
-    if (!parent.canAddSpace(
-        selectedSpace!.wall, selectedSpace!.offsetFromWallStart, newWidth)) {
-      Fluttertoast.showToast(msg: "Cannot resize space to this width");
-      return;
-    }
-
-    // Update the width
-    selectedSpace!.width = newWidth;
-
-    // If connected, update connected space width
-    if (selectedSpace!.connectedSpace != null) {
-      selectedSpace!.connectedSpace!.width = newWidth;
-    }
-
-    notifyListeners();
-  }
-
   // Helper methods
   dynamic _findSpaceParent(Space space) {
     // Check rooms first
@@ -4047,6 +4014,189 @@ class FloorPlanController extends ChangeNotifier {
       notifyListeners();
     } else {
       Fluttertoast.showToast(msg: "Cannot add window at this position");
+    }
+  }
+
+  void resizeDoor(double newWidth) {
+    if (selectedDoor == null) {
+      Fluttertoast.showToast(msg: "No door selected");
+      return;
+    }
+
+    // Find the parent (room or cutout) of the door
+    Room? parentRoom = _findRoomByDoor(selectedDoor!);
+    CutOut? parentCutOut = _findCutOutByDoor(selectedDoor!);
+
+    if (parentRoom != null) {
+      double wallLength =
+          selectedDoor!.wall == "north" || selectedDoor!.wall == "south"
+              ? parentRoom.width
+              : parentRoom.height;
+
+      // Validate new width
+      if (newWidth < Door.minWidth || newWidth > wallLength * 0.8) {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid door width. Must be between ${Door.minWidth} and ${(wallLength * 0.8).toStringAsFixed(1)} feet");
+        return;
+      }
+
+      // Check if new size would overlap with other doors or windows
+      if (parentRoom.canResizeDoor(
+          selectedDoor!.wall, selectedDoor!.offsetFromWallStart, newWidth,
+          excludeDoor: selectedDoor)) {
+        selectedDoor!.width = newWidth;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot resize door: would overlap with other elements");
+      }
+    } else if (parentCutOut != null) {
+      double wallLength =
+          selectedDoor!.wall == "north" || selectedDoor!.wall == "south"
+              ? parentCutOut.width
+              : parentCutOut.height;
+
+      // Validate new width
+      if (newWidth < Door.minWidth || newWidth > wallLength * 0.8) {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid door width. Must be between ${Door.minWidth} and ${(wallLength * 0.8).toStringAsFixed(1)} feet");
+        return;
+      }
+
+      // Check if new size would overlap with other doors or windows
+      if (parentCutOut.canResizeDoor(
+          selectedDoor!.wall, selectedDoor!.offsetFromWallStart, newWidth,
+          excludeDoor: selectedDoor)) {
+        selectedDoor!.width = newWidth;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot resize door: would overlap with other elements");
+      }
+    }
+  }
+
+  void resizeWindow(double newWidth) {
+    if (selectedWindow == null) {
+      Fluttertoast.showToast(msg: "No window selected");
+      return;
+    }
+
+    // Find the parent (room or cutout) of the window
+    Room? parentRoom = _findRoomByWindow(selectedWindow!);
+    CutOut? parentCutOut = _findCutOutByWindow(selectedWindow!);
+
+    if (parentRoom != null) {
+      double wallLength =
+          selectedWindow!.wall == "north" || selectedWindow!.wall == "south"
+              ? parentRoom.width
+              : parentRoom.height;
+
+      // Validate new width
+      if (newWidth < Window.minWidth || newWidth > wallLength * 0.8) {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid window width. Must be between ${Window.minWidth} and ${(wallLength * 0.8).toStringAsFixed(1)} feet");
+        return;
+      }
+
+      // Check if new size would overlap with other elements
+      if (parentRoom.canResizeWindow(
+          selectedWindow!.wall, selectedWindow!.offsetFromWallStart, newWidth,
+          excludeWindow: selectedWindow)) {
+        selectedWindow!.width = newWidth;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot resize window: would overlap with other elements");
+      }
+    } else if (parentCutOut != null) {
+      double wallLength =
+          selectedWindow!.wall == "north" || selectedWindow!.wall == "south"
+              ? parentCutOut.width
+              : parentCutOut.height;
+
+      // Validate new width
+      if (newWidth < Window.minWidth || newWidth > wallLength * 0.8) {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid window width. Must be between ${Window.minWidth} and ${(wallLength * 0.8).toStringAsFixed(1)} feet");
+        return;
+      }
+
+      // Check if new size would overlap with other elements
+      if (parentCutOut.canResizeWindow(
+          selectedWindow!.wall, selectedWindow!.offsetFromWallStart, newWidth,
+          excludeWindow: selectedWindow)) {
+        selectedWindow!.width = newWidth;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot resize window: would overlap with other elements");
+      }
+    }
+  }
+
+  void resizeSpace(double newWidth) {
+    if (selectedSpace == null) {
+      Fluttertoast.showToast(msg: "No space selected");
+      return;
+    }
+
+    // Find the parent (room or cutout) of the space
+    Room? parentRoom = _findRoomBySpace(selectedSpace!);
+    CutOut? parentCutOut = _findCutOutBySpace(selectedSpace!);
+
+    if (parentRoom != null) {
+      double wallLength =
+          selectedSpace!.wall == "north" || selectedSpace!.wall == "south"
+              ? parentRoom.width
+              : parentRoom.height;
+
+      // Validate new width
+      if (newWidth < Space.minWidth || newWidth > wallLength * 0.8) {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid space width. Must be between ${Space.minWidth} and ${(wallLength * 0.8).toStringAsFixed(1)} feet");
+        return;
+      }
+
+      // Check if new size would overlap with other elements
+      if (parentRoom.canResizeSpace(
+          selectedSpace!.wall, selectedSpace!.offsetFromWallStart, newWidth,
+          excludeSpace: selectedSpace)) {
+        selectedSpace!.width = newWidth;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot resize space: would overlap with other elements");
+      }
+    } else if (parentCutOut != null) {
+      double wallLength =
+          selectedSpace!.wall == "north" || selectedSpace!.wall == "south"
+              ? parentCutOut.width
+              : parentCutOut.height;
+
+      // Validate new width
+      if (newWidth < Space.minWidth || newWidth > wallLength * 0.8) {
+        Fluttertoast.showToast(
+            msg:
+                "Invalid space width. Must be between ${Space.minWidth} and ${(wallLength * 0.8).toStringAsFixed(1)} feet");
+        return;
+      }
+
+      // Check if new size would overlap with other elements
+      if (parentCutOut.canResizeSpace(
+          selectedSpace!.wall, selectedSpace!.offsetFromWallStart, newWidth,
+          excludeSpace: selectedSpace)) {
+        selectedSpace!.width = newWidth;
+        notifyListeners();
+      } else {
+        Fluttertoast.showToast(
+            msg: "Cannot resize space: would overlap with other elements");
+      }
     }
   }
 }

@@ -1,9 +1,10 @@
 class Door {
   static const double defaultWidth = 3.0; // 3 feet
-  static const double minDistanceFromCorner = 1.5; // 1.5 feet
-  static const double minDistanceBetweenDoors = 3.0; // 3 feet
-  static const double minDistanceFromWindows =
-      2.0; // 2 feet minimum distance from windows
+  static const double minWidth = 1.0; // 1 feet
+  static const double minDistanceFromCorner = 1.0; // 1 feet
+  static const double minDistanceBetweenDoors = 1.0; // 1 feet
+  static const double minDistanceFromWindows = 1.0; // 1 feet
+  static const double minDistanceFromSpaces = 1.0; // 1 feet
 
   final String id; // Format: "room_name:wall:number" (e.g., "room1:north:1")
   double width;

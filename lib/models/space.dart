@@ -1,11 +1,11 @@
 class Space {
   static const double defaultWidth = 3.0; // 3 feet, like doors
-  static const double minDistanceFromCorner = 1.5; // 1.5 feet
-  static const double minDistanceBetweenSpaces = 3.0; // 3 feet
-  static const double minDistanceFromDoors =
-      2.0; // 2 feet minimum distance from doors
-  static const double minDistanceFromWindows =
-      2.0; // 2 feet minimum distance from windows
+  static const double minWidth = 1.0; // 1 feet
+  static const double minDistanceFromCorner = 1.0; // 1 feet
+  static const double minDistanceBetweenSpaces = 1.0; // 1 feet
+  static const double minDistanceFromDoors = 1.0; // 1 feet
+  static const double minDistanceFromWindows = 1.0; // 1 feet
+  static const double minDistanceFromSpaces = 1.0; // 1 feet
 
   final String id; // Format: "cutout_name:s:number" (e.g., "cutout1:s:1")
   double width;
