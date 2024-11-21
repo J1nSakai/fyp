@@ -35,10 +35,10 @@ class FloorPlanController extends ChangeNotifier {
 
   static const double roomSpacing = 0.0; //  unit spacing between rooms
 
-  double _zoomLevel = 0.5;
+  double _zoomLevel = 1.0;
   static const double _zoomIncrement = 0.2;
-  static const double _minZoom = 0.25;
-  static const double _maxZoom = 6.0;
+  static const double _minZoom = 0.1;
+  static const double _maxZoom = 10.0;
 
   Window? selectedWindow;
 
@@ -91,7 +91,7 @@ class FloorPlanController extends ChangeNotifier {
 
   void removeBase() {
     _floorBase = null;
-    // _saveState()();
+    // _saveState();
     notifyListeners();
   }
 
@@ -512,9 +512,38 @@ class FloorPlanController extends ChangeNotifier {
   }
 
   // Room renaming method:
-  void renameRoom(String name) {
-    selectedRoom!.name = name;
-    // _saveState();
+  void renameRoom(String oldName, String newName) {
+    final roomIndex = _rooms.indexWhere((room) => room.name == oldName);
+    if (roomIndex == -1) {
+      Fluttertoast.showToast(msg: "Room not found");
+      return;
+    }
+
+    Room room = _rooms[roomIndex];
+
+    // Update room name
+    room.name = newName;
+
+    // Update door IDs
+    for (var door in room.doors) {
+      door.updateRoomName(oldName, newName);
+    }
+
+    // Update window IDs
+    for (var window in room.windows) {
+      window.updateRoomName(oldName, newName);
+    }
+
+    // Update space IDs
+    for (var space in room.spaces) {
+      space.updateRoomName(oldName, newName);
+    }
+
+    // Update selected room name if it was the renamed room
+    if (selectedRoomName == oldName) {
+      selectedRoomName = newName;
+    }
+
     notifyListeners();
   }
 
@@ -4312,5 +4341,10 @@ class FloorPlanController extends ChangeNotifier {
             msg: "Cannot resize space: would overlap with other elements");
       }
     }
+  }
+
+  void resetZoom() {
+    _zoomLevel = 1.0; // Reset to default zoom level
+    notifyListeners();
   }
 }

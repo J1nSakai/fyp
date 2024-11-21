@@ -12,10 +12,38 @@ import '../models/space.dart';
 import '../models/window.dart';
 import 'widgets/scale_indicator.dart';
 
-class FloorPlanView extends StatelessWidget {
+class FloorPlanView extends StatefulWidget {
   final FloorPlanController controller;
 
   const FloorPlanView({super.key, required this.controller});
+
+  @override
+  State<FloorPlanView> createState() => _FloorPlanViewState();
+}
+
+class _FloorPlanViewState extends State<FloorPlanView> {
+  final TransformationController _transformationController =
+      TransformationController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    // Update the InteractiveViewer's transform when zoom changes
+    final scale = widget.controller.zoomLevel;
+    final matrix = Matrix4.identity()..scale(scale, scale, 1.0);
+    _transformationController.value = matrix;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,36 +52,36 @@ class FloorPlanView extends StatelessWidget {
     return Stack(
       children: [
         InteractiveViewer(
-          boundaryMargin: const EdgeInsets.all(100),
-          minScale: 0.25,
-          maxScale: 6.0,
+          transformationController: _transformationController,
+          boundaryMargin: const EdgeInsets.all(1000),
+          minScale: 0.1,
+          maxScale: 10.0,
           child: CustomPaint(
             painter: FloorPlanPainter(
-              controller.getRooms(),
-              controller.getStairs(),
-              controller.getBase(),
-              controller.selectedRoomName,
-              controller.selectedStairs,
-              controller.zoomLevel,
-              controller.selectedDoor,
-              controller.selectedWindow,
-              controller.getCutOuts(),
-              controller.selectedCutOut,
-              controller.selectedSpace,
+              widget.controller.getRooms(),
+              widget.controller.getStairs(),
+              widget.controller.getBase(),
+              widget.controller.selectedRoomName,
+              widget.controller.selectedStairs,
+              widget.controller.zoomLevel,
+              widget.controller.selectedDoor,
+              widget.controller.selectedWindow,
+              widget.controller.getCutOuts(),
+              widget.controller.selectedCutOut,
+              widget.controller.selectedSpace,
               isDarkMode,
             ),
             size: Size(
-              MediaQuery.sizeOf(context).width,
-              MediaQuery.sizeOf(context).height,
+              MediaQuery.sizeOf(context).width * 4,
+              MediaQuery.sizeOf(context).height * 4,
             ),
           ),
         ),
-        // Floating Scale Indicator
         Positioned(
           right: 20,
           bottom: 20,
           child: ScaleIndicator(
-            zoomLevel: controller.zoomLevel,
+            zoomLevel: widget.controller.zoomLevel,
           ),
         ),
       ],

@@ -7,7 +7,7 @@ class Space {
   static const double minDistanceFromWindows = 1.0; // 1 feet
   static const double minDistanceFromSpaces = 1.0; // 1 feet
 
-  final String id; // Format: "cutout_name:s:number" (e.g., "cutout1:s:1")
+  String id; // Format: "cutout_name:s:number" (e.g., "cutout1:s:1")
   double width;
   double offsetFromWallStart;
   String wall; // "north", "south", "east", "west"
@@ -59,5 +59,23 @@ class Space {
       wall: wall,
       isHighlighted: isHighlighted,
     );
+  }
+
+  void updateRoomName(String oldRoomName, String newRoomName) {
+    if (id.startsWith(oldRoomName)) {
+      // Create new ID with updated room name
+      final parts = id.split(':');
+      parts[0] = newRoomName;
+      final newId = parts.join(':');
+
+      // Update this space's ID
+      id = newId;
+
+      // Update connected space if it exists and belongs to the same room
+      if (connectedSpace != null &&
+          connectedSpace!.id.startsWith(oldRoomName)) {
+        connectedSpace!.updateRoomName(oldRoomName, newRoomName);
+      }
+    }
   }
 }

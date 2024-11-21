@@ -6,7 +6,7 @@ class Door {
   static const double minDistanceFromWindows = 1.0; // 1 feet
   static const double minDistanceFromSpaces = 1.0; // 1 feet
 
-  final String id; // Format: "room_name:wall:number" (e.g., "room1:north:1")
+  String id; // Format: "room_name:wall:number" (e.g., "room1:north:1")
   double width;
   double offsetFromWallStart;
   String wall; // "north", "south", "east", "west"
@@ -71,5 +71,18 @@ class Door {
       openLeft: openLeft,
       isHighlighted: isHighlighted,
     );
+  }
+
+  // Method to update the door's ID when room is renamed
+  void updateRoomName(String oldRoomName, String newRoomName) {
+    if (id.startsWith(oldRoomName)) {
+      id = id.replaceFirst(oldRoomName, newRoomName);
+
+      // If this door is connected to another door, update its connected door's ID too
+      if (connectedDoor != null && connectedDoor!.id.startsWith(oldRoomName)) {
+        connectedDoor!.id =
+            connectedDoor!.id.replaceFirst(oldRoomName, newRoomName);
+      }
+    }
   }
 }

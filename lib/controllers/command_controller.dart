@@ -174,7 +174,7 @@ class CommandController {
     } else if (tokens.contains("stairs")) {
       _handleStairsCommand(command, tokens);
       return;
-    } else if (tokens.contains("zoom")) {
+    } else if (tokens.contains("scale")) {
       _handleZoomCommand(tokens);
       return;
     } else if ((tokens.contains("add") || tokens.contains("create")) &&
@@ -340,9 +340,18 @@ class CommandController {
       } else {
         nameTokens = tokens.sublist(1);
       }
-      String newName = nameTokens.join(" ");
-      floorPlanController?.renameRoom(newName.trim());
-      floorPlanController?.deselectRoom();
+      String newName = nameTokens.join(" ").trim();
+
+      // Rename the room but don't deselect it
+      floorPlanController?.renameRoom(selectedRoom!.name, newName);
+
+      // Update the selected room reference with the new name
+      selectedRoom = floorPlanController
+          ?.getRooms()
+          .firstWhere((room) => room.name == newName);
+
+      // Remove this line that was deselecting the room
+      // floorPlanController?.deselectRoom();
     } else {
       MessageService.showMessage(
           floorManagerController.context, "Please select a room first.",
@@ -351,7 +360,6 @@ class CommandController {
   }
 
   void _handleMoveCommand(List<String> tokens, BuildContext context) {
-    print("here");
     if (floorPlanController?.selectedStairs != null) {
       // Handle stairs movement
       if (tokens.contains("to")) {
@@ -1386,6 +1394,16 @@ class CommandController {
       return;
     }
 
+    if (tokens.contains("reset")) {
+      floorPlanController?.resetZoom();
+      MessageService.showMessage(
+        floorManagerController.context,
+        "Zoom reset to default",
+        type: MessageType.info,
+      );
+      return;
+    }
+
     // Handle specific zoom level
     if (tokens.contains("to")) {
       int toIndex = tokens.indexOf("to");
@@ -1407,7 +1425,7 @@ class CommandController {
 
     MessageService.showMessage(
       floorManagerController.context,
-      "Invalid zoom command. Try: 'zoom in', 'zoom out', or 'zoom to 2.0'",
+      "Invalid zoom command. Try: 'zoom in', 'zoom out', 'zoom reset', or 'zoom to 2.0'",
       type: MessageType.error,
     );
   }
