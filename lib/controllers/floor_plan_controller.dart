@@ -35,7 +35,7 @@ class FloorPlanController extends ChangeNotifier {
 
   static const double roomSpacing = 0.0; //  unit spacing between rooms
 
-  double _zoomLevel = 1.0;
+  double _zoomLevel = 0.5;
   static const double _zoomIncrement = 0.2;
   static const double _minZoom = 0.25;
   static const double _maxZoom = 6.0;
@@ -44,9 +44,9 @@ class FloorPlanController extends ChangeNotifier {
 
   // Add these properties for state management
   // final List<Map<String, dynamic>> _undoStack = [];
-  // final List<Map<String, dynamic>> _redoStack = [];
-  static const int maxUndoSteps =
-      20; // Limit stack size to prevent memory issues
+  // // final List<Map<String, dynamic>> _redoStack = [];
+  // static const int maxUndoSteps =
+  //     20; // Limit stack size to prevent memory issues
 
   // All getters:
   double get zoomLevel => _zoomLevel;
@@ -1158,29 +1158,69 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    // Create a temporary list without the selected room to check overlap
-    List<Room> otherRooms =
-        _rooms.where((room) => room != selectedRoom).toList();
-
     // Check for overlaps with other rooms
     bool wouldOverlap = false;
-    for (final existingRoom in otherRooms) {
-      if (_checkOverlap(currentPosition, newWidth, newHeight,
-          existingRoom.position, existingRoom.width, existingRoom.height)) {
+
+    // Check other rooms
+    for (final existingRoom in _rooms) {
+      if (existingRoom != selectedRoom &&
+          _checkOverlap(currentPosition, newWidth, newHeight,
+              existingRoom.position, existingRoom.width, existingRoom.height)) {
         wouldOverlap = true;
         break;
       }
     }
 
+    // Check cutouts
     if (!wouldOverlap) {
+      for (final cutOut in _cutOuts) {
+        if (_checkOverlap(currentPosition, newWidth, newHeight, cutOut.position,
+            cutOut.width, cutOut.height)) {
+          wouldOverlap = true;
+          break;
+        }
+      }
+    }
+
+    // Check stairs
+    if (!wouldOverlap) {
+      for (final stair in _stairs) {
+        if (_checkOverlap(currentPosition, newWidth, newHeight, stair.position,
+            stair.width, stair.length)) {
+          wouldOverlap = true;
+          break;
+        }
+      }
+    }
+
+    if (!wouldOverlap) {
+      // Check if any connected doors would be invalid with new dimensions
+      bool doorPositionsValid = true;
+      for (Door door in selectedRoom!.doors) {
+        double wallLength =
+            door.wall == "north" || door.wall == "south" ? newWidth : newHeight;
+
+        if (door.offsetFromWallStart + door.width >
+                wallLength - Door.minDistanceFromCorner ||
+            door.offsetFromWallStart < Door.minDistanceFromCorner) {
+          doorPositionsValid = false;
+          break;
+        }
+      }
+
+      if (!doorPositionsValid) {
+        Fluttertoast.showToast(
+            msg: "Cannot resize room - would invalidate door positions");
+        return;
+      }
+
       selectedRoom!.width = newWidth;
       selectedRoom!.height = newHeight;
       Fluttertoast.showToast(msg: "Room resized successfully");
-      // _saveState();
       notifyListeners();
     } else {
       Fluttertoast.showToast(
-          msg: "Cannot resize room - would overlap with other rooms");
+          msg: "Cannot resize room - would overlap with other elements");
     }
   }
 
@@ -1205,41 +1245,102 @@ class FloorPlanController extends ChangeNotifier {
     // Store current position
     Offset currentPosition = selectedCutOut!.position;
 
-    // Check if the room would still fit within the base with new dimensions
+    // Check if the cutout would still fit within the base with new dimensions
     if (!_roomFitsWithinBase(newWidth, newHeight, currentPosition)) {
       Fluttertoast.showToast(
-          msg: "New size would place room outside base boundaries");
+          msg: "New size would place cutout outside base boundaries");
       return;
     }
 
-    // Create a temporary list without the selected room to check overlap
-    List<CutOut> otherCutOuts =
-        _cutOuts.where((cutOut) => cutOut != selectedCutOut).toList();
-
-    // Check for overlaps with other rooms
+    // Check for overlaps with all elements
     bool wouldOverlap = false;
-    for (final existingCutOut in otherCutOuts) {
-      if (_checkOverlap(
-          currentPosition,
-          newWidth,
-          newHeight,
-          existingCutOut.position,
-          existingCutOut.width,
-          existingCutOut.height)) {
+
+    // Check other cutouts
+    for (final existingCutOut in _cutOuts) {
+      if (existingCutOut != selectedCutOut &&
+          _checkOverlap(
+              currentPosition,
+              newWidth,
+              newHeight,
+              existingCutOut.position,
+              existingCutOut.width,
+              existingCutOut.height)) {
         wouldOverlap = true;
         break;
       }
     }
 
+    // Check rooms
     if (!wouldOverlap) {
+      for (final room in _rooms) {
+        if (_checkOverlap(currentPosition, newWidth, newHeight, room.position,
+            room.width, room.height)) {
+          wouldOverlap = true;
+          break;
+        }
+      }
+    }
+
+    // Check stairs
+    if (!wouldOverlap) {
+      for (final stair in _stairs) {
+        if (_checkOverlap(currentPosition, newWidth, newHeight, stair.position,
+            stair.width, stair.length)) {
+          wouldOverlap = true;
+          break;
+        }
+      }
+    }
+
+    if (!wouldOverlap) {
+      // Check if any connected doors would be invalid with new dimensions
+      bool doorPositionsValid = true;
+      for (Door door in selectedCutOut!.doors) {
+        double wallLength =
+            door.wall == "north" || door.wall == "south" ? newWidth : newHeight;
+
+        if (door.offsetFromWallStart + door.width >
+                wallLength - Door.minDistanceFromCorner ||
+            door.offsetFromWallStart < Door.minDistanceFromCorner) {
+          doorPositionsValid = false;
+          break;
+        }
+      }
+
+      if (!doorPositionsValid) {
+        Fluttertoast.showToast(
+            msg: "Cannot resize cutout - would invalidate door positions");
+        return;
+      }
+
+      // Check if any windows would be invalid with new dimensions
+      bool windowPositionsValid = true;
+      for (Window window in selectedCutOut!.windows) {
+        double wallLength = window.wall == "north" || window.wall == "south"
+            ? newWidth
+            : newHeight;
+
+        if (window.offsetFromWallStart + window.width >
+                wallLength - Window.minDistanceFromCorner ||
+            window.offsetFromWallStart < Window.minDistanceFromCorner) {
+          windowPositionsValid = false;
+          break;
+        }
+      }
+
+      if (!windowPositionsValid) {
+        Fluttertoast.showToast(
+            msg: "Cannot resize cutout - would invalidate window positions");
+        return;
+      }
+
       selectedCutOut!.width = newWidth;
       selectedCutOut!.height = newHeight;
       Fluttertoast.showToast(msg: "Cutout resized successfully");
-      // _saveState();
       notifyListeners();
     } else {
       Fluttertoast.showToast(
-          msg: "Cannot resize cutout - would overlap with other cutouts");
+          msg: "Cannot resize cutout - would overlap with other elements");
     }
   }
 
@@ -1549,55 +1650,77 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    if (_floorBase == null) {
-      Fluttertoast.showToast(msg: "No base exists");
+    // Only check absolute minimum dimensions
+    if (newWidth < Stairs.minWidth) {
+      Fluttertoast.showToast(
+          msg: "Minimum stair width is ${Stairs.minWidth}ft");
       return;
     }
 
-    // Check if new dimensions are valid
-    if (newWidth <= 0 || newLength <= 0) {
+    if (newLength < Stairs.minLength) {
       Fluttertoast.showToast(
-          msg: "Invalid dimensions. Must be greater than 0.");
+          msg: "Minimum stair length is ${Stairs.minLength}ft");
       return;
     }
 
     // Store current position
     Offset currentPosition = selectedStairs!.position;
 
-    // Check if the room would still fit within the base with new dimensions
+    // Check if the stairs would still fit within the base
     if (!_stairsFitsWithinBase(newWidth, newLength, currentPosition)) {
       Fluttertoast.showToast(
           msg: "New size would place stairs outside base boundaries");
       return;
     }
 
-    // Create a temporary list without the selected room to check overlap
-    List<Stairs> otherStairs =
-        _stairs.where((stairs) => stairs != selectedStairs).toList();
-
-    // Check for overlaps with other rooms
     bool wouldOverlap = false;
-    for (final existingStairs in otherStairs) {
-      if (_checkOverlap(
-          currentPosition,
-          newWidth,
-          newLength,
-          existingStairs.position,
-          existingStairs.width,
-          existingStairs.length)) {
+
+    // Check overlaps with other elements
+    for (final existingStairs in _stairs) {
+      if (existingStairs != selectedStairs &&
+          _checkOverlap(
+              currentPosition,
+              newWidth,
+              newLength,
+              existingStairs.position,
+              existingStairs.width,
+              existingStairs.length)) {
         wouldOverlap = true;
         break;
+      }
+    }
+
+    // Check rooms
+    if (!wouldOverlap) {
+      for (final room in _rooms) {
+        if (_checkOverlap(currentPosition, newWidth, newLength, room.position,
+            room.width, room.height)) {
+          wouldOverlap = true;
+          break;
+        }
+      }
+    }
+
+    // Check cutouts
+    if (!wouldOverlap) {
+      for (final cutOut in _cutOuts) {
+        if (_checkOverlap(currentPosition, newWidth, newLength, cutOut.position,
+            cutOut.width, cutOut.height)) {
+          wouldOverlap = true;
+          break;
+        }
       }
     }
 
     if (!wouldOverlap) {
       selectedStairs!.width = newWidth;
       selectedStairs!.length = newLength;
+      selectedStairs!.updateStepCalculations();
+      notifyListeners();
       Fluttertoast.showToast(msg: "Stairs resized successfully");
     } else {
       Fluttertoast.showToast(
-          msg:
-              "Cannot resize Stairs - would overlap with other rooms or stairs");
+          msg: "Cannot resize stairs - would overlap with other elements");
     }
   }
 
@@ -1655,7 +1778,7 @@ class FloorPlanController extends ChangeNotifier {
     // Replace old stairs with rotated one
     _stairs[stairsIndex] = rotatedStairs;
     selectStairs(rotatedStairs.name);
-    // _saveState()();
+    // _saveState();
     notifyListeners();
 
     Fluttertoast.showToast(msg: "Stairs rotated successfully");
@@ -1917,7 +2040,7 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     room.doors.add(newDoor);
-    // _saveState()();
+    // _saveState();
     notifyListeners();
 
     Fluttertoast.showToast(msg: "Door added successfully to ${room.name}");
@@ -2073,9 +2196,10 @@ class FloorPlanController extends ChangeNotifier {
       return;
     }
 
-    // Find the room that contains the selected door
+    // Find the parent of the selected door
     Room? doorRoom = _findRoomByDoor(selectedDoor!);
     CutOut? cutoutRoom = _findCutOutByDoor(selectedDoor!);
+
     if (doorRoom != null) {
       // Calculate wall length based on door's wall
       double wallLength = (selectedDoor!.wall == "north" ||
@@ -2085,38 +2209,44 @@ class FloorPlanController extends ChangeNotifier {
           ? doorRoom.width
           : doorRoom.height;
 
-      // Adjust door width for small rooms
-      double calculatedWidth = (wallLength / 3).clamp(1.5, 4.0);
+      // Use the actual door width instead of calculating a new one
+      double doorWidth = selectedDoor!.width;
 
       // Adjust minimum corner distance for small rooms
       double minCornerDistance =
           (wallLength < 6) ? 0.5 : Door.minDistanceFromCorner;
 
       // Calculate valid range for door placement
-      double maxOffset = wallLength - calculatedWidth - minCornerDistance;
       double minOffset = minCornerDistance;
+      double maxOffset = wallLength - doorWidth - minCornerDistance;
 
       if (newOffset >= minOffset && newOffset <= maxOffset) {
-        selectedDoor!.offsetFromWallStart = newOffset;
+        // Check if the new position would overlap with other elements
+        if (doorRoom.canResizeDoor(selectedDoor!.wall, newOffset, doorWidth,
+            excludeDoor: selectedDoor)) {
+          selectedDoor!.offsetFromWallStart = newOffset;
 
-        // Update connected door if exists
-        if (selectedDoor!.connectedDoor != null) {
-          Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
-          if (connectedRoom != null) {
-            double newConnectedOffset = _calculateAdjacentDoorOffsetForRoom(
-                doorRoom, connectedRoom, selectedDoor!);
-            selectedDoor!.connectedDoor!.offsetFromWallStart =
-                newConnectedOffset;
+          // Update connected door if exists
+          if (selectedDoor!.connectedDoor != null) {
+            Room? connectedRoom = _findRoomByDoor(selectedDoor!.connectedDoor!);
+            if (connectedRoom != null) {
+              double newConnectedOffset = _calculateAdjacentDoorOffsetForRoom(
+                  doorRoom, connectedRoom, selectedDoor!);
+              selectedDoor!.connectedDoor!.offsetFromWallStart =
+                  newConnectedOffset;
+            }
           }
-        }
 
-        // _saveState();
-        notifyListeners();
-        Fluttertoast.showToast(msg: "Door moved");
+          notifyListeners();
+          Fluttertoast.showToast(msg: "Door moved");
+        } else {
+          Fluttertoast.showToast(
+              msg: "Cannot move door: would overlap with other elements");
+        }
       } else {
         Fluttertoast.showToast(
             msg:
-                "Invalid door position. Door must be at least ${minCornerDistance}ft from corners.");
+                "Invalid door position. Must be between ${minOffset.toStringAsFixed(1)}ft and ${maxOffset.toStringAsFixed(1)}ft");
       }
     } else if (cutoutRoom != null) {
       // Calculate wall length based on door's wall
@@ -2213,7 +2343,7 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     room.doors.clear();
-    // _saveState()();
+    // _saveState();
     notifyListeners();
 
     Fluttertoast.showToast(msg: "All doors removed from ${room.name}");
@@ -2249,68 +2379,52 @@ class FloorPlanController extends ChangeNotifier {
     deselectDoor();
   }
 
-  void changeDoorSwing(String roomName, String doorId, bool swingInward) {
-    if (selectedDoor?.id != doorId) {
-      Fluttertoast.showToast(msg: "Please select the door first");
+  void changeDoorSwing(bool swingInward) {
+// commands:
+// open door left
+// open door right
+// door opens left
+// door opens right
+
+    if (selectedDoor == null) {
+      Fluttertoast.showToast(msg: "No door selected");
       return;
     }
-    Room? room = _findRoomByName(roomName);
-    if (room != selectedRoom) {
-      Fluttertoast.showToast(
-          msg: "Please select the room first before modifying doors");
-      return;
+
+    selectedDoor!.swingInward = swingInward;
+
+    // If this door is connected to another door, update its swing direction too
+    if (selectedDoor!.connectedDoor != null) {
+      selectedDoor!.connectedDoor!.swingInward =
+          !swingInward; // Opposite direction for connected door
     }
 
-    try {
-      Door door = room!.doors.firstWhere((d) => d.id == doorId);
-      door.swingInward = swingInward;
-
-      // Update connected door if it exists
-      if (door.connectedDoor != null) {
-        door.connectedDoor!.swingInward =
-            !swingInward; // Opposite swing for connected door
-      }
-
-      // _saveState()();
-      notifyListeners();
-
-      Fluttertoast.showToast(msg: "Door swing direction updated");
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Door not found");
-    }
+    notifyListeners();
+    Fluttertoast.showToast(msg: "Door swing direction changed");
   }
 
   // Helper method to change door opening direction (left/right)
-  void changeDoorOpeningDirection(
-      String roomName, String doorId, bool openLeft) {
-    if (selectedDoor?.id != doorId) {
-      Fluttertoast.showToast(msg: "Please select the door first");
+  void changeDoorOpeningDirection(bool openLeft) {
+    // commands:
+    // swing door in
+    // swing door out
+    // door swing inward
+    // door swing outward
+    if (selectedDoor == null) {
+      Fluttertoast.showToast(msg: "No door selected");
       return;
     }
-    Room? room = _findRoomByName(roomName);
-    if (room != selectedRoom) {
-      Fluttertoast.showToast(
-          msg: "Please select the room first before modifying doors");
-      return;
+
+    selectedDoor!.openLeft = openLeft;
+
+    // If this door is connected to another door, update its opening direction too
+    if (selectedDoor!.connectedDoor != null) {
+      selectedDoor!.connectedDoor!.openLeft =
+          !openLeft; // Opposite direction for connected door
     }
 
-    try {
-      Door door = room!.doors.firstWhere((d) => d.id == doorId);
-      door.openLeft = openLeft;
-
-      // Update connected door if it exists
-      if (door.connectedDoor != null) {
-        door.connectedDoor!.openLeft =
-            !openLeft; // Opposite opening direction for connected door
-      }
-
-      // _saveState();
-      notifyListeners();
-
-      Fluttertoast.showToast(msg: "Door opening direction updated");
-    } catch (e) {
-      Fluttertoast.showToast(msg: "Door not found");
-    }
+    notifyListeners();
+    Fluttertoast.showToast(msg: "Door opening direction changed");
   }
 
   // Add a method to highlight selected room's doors

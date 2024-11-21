@@ -351,6 +351,7 @@ class CommandController {
   }
 
   void _handleMoveCommand(List<String> tokens, BuildContext context) {
+    print("here");
     if (floorPlanController?.selectedStairs != null) {
       // Handle stairs movement
       if (tokens.contains("to")) {
@@ -1576,29 +1577,9 @@ class CommandController {
   }
 
   void _handleDoorSwingCommand(List<String> tokens) {
-    if (selectedRoom == null) {
+    if (floorPlanController?.selectedDoor == null) {
       MessageService.showMessage(
-          floorManagerController.context, "Please select a room first",
-          type: MessageType.error);
-      return;
-    }
-
-    // Extract door number
-    int? doorNumber;
-    for (int i = 0; i < tokens.length; i++) {
-      if (tokens[i] == "door" && i + 1 < tokens.length) {
-        try {
-          doorNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    if (doorNumber == null) {
-      MessageService.showMessage(
-          floorManagerController.context, "Please specify which door to modify",
+          floorManagerController.context, "Please select a door first",
           type: MessageType.error);
       return;
     }
@@ -1618,8 +1599,8 @@ class CommandController {
       return;
     }
 
-    floorPlanController?.changeDoorSwing(
-        selectedRoom!.name, "${selectedRoom!.name}:$doorNumber", swingInward);
+    // Use the selected door directly
+    floorPlanController?.changeDoorSwing(swingInward);
   }
 
   void _handleRemoveDoorCommand(List<String> tokens) {
@@ -1634,44 +1615,10 @@ class CommandController {
   }
 
   void _handleDoorOpeningDirectionCommand(List<String> tokens) {
-    if (selectedRoom == null) {
+    if (floorPlanController?.selectedDoor == null) {
       MessageService.showMessage(
         floorManagerController.context,
-        "Please select a room first",
-        type: MessageType.error,
-      );
-      return;
-    }
-
-    // Extract door number
-    int? doorNumber;
-    for (int i = 0; i < tokens.length; i++) {
-      if (tokens[i] == "door" && i + 1 < tokens.length) {
-        try {
-          doorNumber = int.parse(tokens[i + 1]);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-
-    if (doorNumber == null) {
-      MessageService.showMessage(
-        floorManagerController.context,
-        "Please specify which door to modify",
-        type: MessageType.error,
-      );
-      return;
-    }
-
-    String doorId = "${selectedRoom!.name}:$doorNumber";
-
-    // Check if the door is selected
-    if (floorPlanController?.selectedDoor?.id != doorId) {
-      MessageService.showMessage(
-        floorManagerController.context,
-        "Please select the door first using 'select door $doorNumber'",
+        "Please select a door first",
         type: MessageType.error,
       );
       return;
@@ -1693,11 +1640,7 @@ class CommandController {
       return;
     }
 
-    floorPlanController?.changeDoorOpeningDirection(
-      selectedRoom!.name,
-      doorId,
-      openLeft,
-    );
+    floorPlanController?.changeDoorOpeningDirection(openLeft);
   }
 
   void _handleWindowCommand(String command, List<String> tokens) {
