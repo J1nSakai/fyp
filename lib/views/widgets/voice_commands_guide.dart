@@ -23,12 +23,12 @@ class VoiceCommandsDialog extends StatefulWidget {
 
 class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
   CommandDetails? _selectedCommand;
-  final List<CommandDetails> commands = [
+  final List<CommandDetails> baseCommands = [
     CommandDetails(
       command: 'create base',
       description:
           'Creates a new floor base with default dimensions. This is typically the first command you\'ll use when starting a new floor plan.',
-      variations: ['new base', 'add base'],
+      variations: ['new base', 'add base', 'create base'],
     ),
     // Add more commands...
   ];
@@ -75,13 +75,6 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            command.description,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-            ),
-          ),
-          const SizedBox(height: 24),
           if (command.imagePath != null) ...[
             Text(
               'Example',
@@ -99,6 +92,14 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
             ),
             const SizedBox(height: 24),
           ],
+          const SizedBox(height: 8),
+          Text(
+            command.description,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 24),
           if (command.variations != null && command.variations!.isNotEmpty) ...[
             Text(
               'Variations',
@@ -109,18 +110,20 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            ...command.variations!.map((variation) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    '• "$variation"',
-                    style: TextStyle(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.8),
-                    ),
+            ...command.variations!.map(
+              (variation) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '• "$variation"',
+                  style: TextStyle(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.8),
                   ),
-                )),
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -196,13 +199,33 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
                       child: ListView(
                         children: [
                           _buildCommandCategory(
-                            'Entity Commands',
-                            Icons.category,
+                            'Base Commands',
+                            Icons.home,
                             isSelected: true,
                           ),
                           _buildCommandCategory(
-                            'Floor Commands',
-                            Icons.layers,
+                            'Room Commands',
+                            Icons.square_outlined,
+                          ),
+                          _buildCommandCategory(
+                            'Stairs Commands',
+                            Icons.stairs,
+                          ),
+                          _buildCommandCategory(
+                            'Door Commands',
+                            Icons.door_front_door,
+                          ),
+                          _buildCommandCategory(
+                            'Window Commands',
+                            Icons.window,
+                          ),
+                          _buildCommandCategory(
+                            'Space Commands',
+                            Icons.space_bar,
+                          ),
+                          _buildCommandCategory(
+                            'Cutout Commands',
+                            Icons.cut,
                           ),
                           // ... other categories
                         ],
@@ -237,7 +260,7 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
                                     ),
                                   ),
                                   const SizedBox(height: 16),
-                                  ...commands.map((cmd) => InkWell(
+                                  ...baseCommands.map((cmd) => InkWell(
                                         onTap: () => setState(
                                             () => _selectedCommand = cmd),
                                         child: Container(
