@@ -42,6 +42,7 @@ class _IntroViewState extends State<IntroView> {
           radius: const Radius.circular(4),
           child: SingleChildScrollView(
             controller: _scrollController,
+            physics: const RangeMaintainingScrollPhysics(),
             child: Container(
               constraints: BoxConstraints(
                 minHeight: screenHeight,
@@ -89,7 +90,9 @@ class _IntroViewState extends State<IntroView> {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 32, vertical: 16),
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
                         child: Text(
                           "A screen reader-friendly architectural design tool that puts accessibility first.",
                           textAlign: TextAlign.center,
@@ -207,10 +210,10 @@ class _IntroViewState extends State<IntroView> {
                                           ),
                                           const SizedBox(height: 12),
                                           Text(
-                                            "• Screen reader compatibility\n"
-                                            "• Voice command feedback\n"
-                                            "• Semantic structure\n"
-                                            "• Keyboard navigation",
+                                            "• Screen reader compatibility.\n"
+                                            "• Voice command feedback.\n"
+                                            "• Semantic structure.\n"
+                                            "• Keyboard navigation.",
                                             style: TextStyle(
                                               color: Colors.grey[700],
                                               height: 1.5,
@@ -375,39 +378,50 @@ class _IntroViewState extends State<IntroView> {
     required String title,
     required String description,
   }) {
-    return Container(
-      width: double.infinity,
-      height: 190,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.grey[700], size: 32),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: double.infinity,
+        height: 190,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: Text(
-              description,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-                height: 1.5,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.grey[700], size: 32),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Expanded(
+              child: Text(
+                description,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

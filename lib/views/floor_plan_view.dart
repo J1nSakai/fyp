@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:saysketch_v2/controllers/floor_plan_controller.dart';
 import 'package:saysketch_v2/models/door.dart';
 import 'package:saysketch_v2/models/floor_base_model.dart';
@@ -148,11 +149,13 @@ class FloorPlanPainter extends CustomPainter {
     final roomTextStyle = TextStyle(
       color: textColor,
       fontSize: 14,
+      fontFamily: GoogleFonts.outfit().fontFamily,
     );
 
     final baseTextStyle = TextStyle(
       color: textColor,
       fontSize: 16,
+      fontFamily: GoogleFonts.outfit().fontFamily,
     );
 
     // Draw base if present
@@ -437,6 +440,7 @@ class FloorPlanPainter extends CustomPainter {
         color: textColor,
         fontSize: 14 * zoomLevel,
         fontWeight: FontWeight.w500,
+        fontFamily: GoogleFonts.outfit().fontFamily,
       );
 
       final stairText = "Stairs ${stair.name.substring(stair.name.length - 1)}";
@@ -548,6 +552,7 @@ class FloorPlanPainter extends CustomPainter {
       final cutOutTextStyle = TextStyle(
         color: textColor.withOpacity(0.4),
         fontSize: 16,
+        fontFamily: GoogleFonts.outfit().fontFamily,
       );
       // Draw cutout label
       final cutOutText =

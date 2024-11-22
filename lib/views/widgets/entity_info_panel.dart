@@ -41,86 +41,96 @@ class EntityInfoPanel extends StatelessWidget {
         selectedCutOut != null ||
         selectedSpace != null;
 
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: hasSelection ? 1.0 : 0.0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(
-            left: BorderSide(
-              color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
-              width: 1,
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      offset: Offset(hasSelection ? 0 : 1, 0),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: hasSelection ? 1.0 : 0.0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(
+              left: BorderSide(
+                color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+                width: 1,
+              ),
             ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _getHeaderTitle(selectedRoom, selectedStairs, selectedDoor,
-                        selectedWindow, selectedCutOut, selectedSpace),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+                      width: 1,
                     ),
                   ),
-                  // MouseRegion(
-                  //   cursor: SystemMouseCursors.click,
-                  //   child: GestureDetector(
-                  //     onTap: () {
-                  //       if (selectedWindow != null) {
-                  //         controller?.deselectWindow();
-                  //       } else if (selectedDoor != null) {
-                  //         controller?.deselectDoor();
-                  //       } else if (selectedRoom != null) {
-                  //         controller?.deselectRoom();
-                  //       } else if (selectedStairs != null) {
-                  //         controller?.deselectStairs();
-                  //       } else if (selectedCutOut != null) {
-                  //         controller?.deselectCutOut();
-                  //       } else if (selectedSpace != null) {
-                  //         controller?.deselectSpace();
-                  //       }
-                  //     },
-                  //     child: const Icon(Icons.close, size: 20),
-                  //   ),
-                  // ),
-                ],
-              ),
-            ),
-
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _buildContent(
-                      context,
-                      selectedRoom,
-                      selectedStairs,
-                      selectedDoor,
-                      selectedWindow,
-                      selectedCutOut,
-                      selectedSpace),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _getHeaderTitle(
+                          selectedRoom,
+                          selectedStairs,
+                          selectedDoor,
+                          selectedWindow,
+                          selectedCutOut,
+                          selectedSpace),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    // MouseRegion(
+                    //   cursor: SystemMouseCursors.click,
+                    //   child: GestureDetector(
+                    //     onTap: () {
+                    //       if (selectedWindow != null) {
+                    //         controller?.deselectWindow();
+                    //       } else if (selectedDoor != null) {
+                    //         controller?.deselectDoor();
+                    //       } else if (selectedRoom != null) {
+                    //         controller?.deselectRoom();
+                    //       } else if (selectedStairs != null) {
+                    //         controller?.deselectStairs();
+                    //       } else if (selectedCutOut != null) {
+                    //         controller?.deselectCutOut();
+                    //       } else if (selectedSpace != null) {
+                    //         controller?.deselectSpace();
+                    //       }
+                    //     },
+                    //     child: const Icon(Icons.close, size: 20),
+                    //   ),
+                    // ),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildContent(
+                        context,
+                        selectedRoom,
+                        selectedStairs,
+                        selectedDoor,
+                        selectedWindow,
+                        selectedCutOut,
+                        selectedSpace),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

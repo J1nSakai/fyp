@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:saysketch_v2/views/intro_view.dart';
 
@@ -41,7 +42,7 @@ class _MyAppState extends State<MyApp> {
             surface: const Color(0xFFF7F7F9),
           ),
           useMaterial3: true,
-          fontFamily: 'Inter',
+          fontFamily: GoogleFonts.outfit().fontFamily,
           appBarTheme: const AppBarTheme(
             elevation: 0,
             backgroundColor: Color(0xFF2D3250),
@@ -59,7 +60,7 @@ class _MyAppState extends State<MyApp> {
             surface: const Color(0xFF1A1B26),
           ),
           useMaterial3: true,
-          fontFamily: 'Inter',
+          fontFamily: GoogleFonts.outfit().fontFamily,
           appBarTheme: const AppBarTheme(
             elevation: 0,
             backgroundColor: Color(0xFF1A1B26),

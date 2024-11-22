@@ -110,6 +110,9 @@ class CommandHistoryPanel extends StatelessWidget {
                       ),
                     );
                   },
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
                 ),
               ),
             ),
