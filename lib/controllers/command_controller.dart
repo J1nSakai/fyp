@@ -1427,7 +1427,7 @@ class CommandController {
     }
 
     // Handle specific zoom level
-    if (tokens.contains("to")) {
+    if (tokens.contains("to") || tokens.contains("by")) {
       int toIndex = tokens.indexOf("to");
       if (toIndex + 1 < tokens.length) {
         try {

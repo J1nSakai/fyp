@@ -2464,8 +2464,6 @@ class FloorPlanController extends ChangeNotifier {
 
   void changeDoorSwing(bool swingInward) {
 // commands:
-// open door left
-// open door right
 // door opens left
 // door opens right
 

@@ -549,6 +549,30 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
           '   • The <offset> could be any number. It represents the displacement of the door (in ft).',
     ),
     CommandDetails(
+      command: '"door opens <direction>"',
+      description:
+          'Changes the direction in which the selected door opens. By default, every door\'s <direction> is set to "left".\n'
+          '   • The <direction> could be:\n'
+          '       • "left"\n'
+          '       • "right"',
+    ),
+    CommandDetails(
+      command: '"door swing <direction>"',
+      description:
+          'Changes the selected door to swing in the specified direction.\n'
+          '   • The <direction> could be:\n'
+          '       • "inward"\n'
+          '       • "outward"\n'
+          '       • "in"\n'
+          '       • "out"',
+    ),
+    CommandDetails(
+      command: '"resize door to <width>"',
+      description:
+          'Changes the width of the selected door to the specified width.\n'
+          '   • The <width> could be any number. It represents the new width of the door (in ft).',
+    ),
+    CommandDetails(
       command: '"remove door"',
       description: 'Removes the selected door from the base.',
     ),
@@ -557,8 +581,118 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
       description: 'Deselects the currently selected door.',
     ),
   ];
-  final List<CommandDetails> windowCommands = [];
-  final List<CommandDetails> spaceCommands = [];
+  final List<CommandDetails> windowCommands = [
+    CommandDetails(
+      command: '"add window on <side>"',
+      description:
+          'Creates a window on the specified side of the selected room or cutout.\n'
+          '   • The <side> could be:\n'
+          '       • "left" or "west"\n'
+          '       • "right" or "east"\n'
+          '       • "up" or "north"\n'
+          '       • "down" or "south"\n\n'
+          'Note:\n'
+          '   • By default, the width of the window will be 1/3 of the length of the <side> it is being added to.',
+      imagePath: 'window_command_pics/default_window.png',
+    ),
+    CommandDetails(
+      command: '"select window <window number>"',
+      description:
+          'Selects the window with the specified number to perform actions on it. The selected window will be colored yellow.\n'
+          '   • The <window number> is the number of the window that you want to select (e.g. "window 1", etc.).\n\n'
+          'Note:\n'
+          '   • The <window number> can be found by selecting the window and viewing the Info Panel.',
+      imagePath: 'window_command_pics/select_window.png',
+    ),
+    CommandDetails(
+      command: '"move window to <offset>"',
+      description:
+          'Moves the selected window to a specified offset from the corner of the wall of the room or cutout it is attached to.\n'
+          '   • The <offset> could be any number. It represents the displacement of the window (in ft).',
+    ),
+    CommandDetails(
+      command: '"resize window to <width>"',
+      description:
+          'Changes the width of the selected window to the specified width.\n'
+          '   • The <width> could be any number. It represents the new width of the window (in ft).',
+    ),
+    CommandDetails(
+      command: '"remove window"',
+      description: 'Removes the selected window from the base.',
+    ),
+    CommandDetails(
+      command: '"deselect"',
+      description: 'Deselects the currently selected window.',
+    ),
+  ];
+
+  final List<CommandDetails> spaceCommands = [
+    CommandDetails(
+      command: '"add space on <side>"',
+      description:
+          'Creates a space between the selected room or cutout and the adjacent room or cutout.\n'
+          '   • The <side> could be:\n'
+          '       • "left" or "west"\n'
+          '       • "right" or "east"\n'
+          '       • "up" or "north"\n'
+          '       • "down" or "south"\n\n'
+          'Note:\n'
+          '   • By default, the width of the space will be 1/3 of the length of the <side> it is being added to.',
+      imagePath: 'space_command_pics/default_space.png',
+    ),
+    CommandDetails(
+      command: '"select space <space number>"',
+      description:
+          'Selects the space with the specified number to perform actions on it. The selected space will be colored yellow.\n'
+          '   • The <space number> is the number of the space that you want to select (e.g. "space 1", etc.).\n\n'
+          'Note:\n'
+          '   • The <space number> can be found by selecting the space and viewing the Info Panel.',
+      imagePath: 'space_command_pics/select_space.png',
+    ),
+    CommandDetails(
+      command: '"move space to <offset>"',
+      description:
+          'Moves the selected space to a specified offset from the corner of the wall of the room or cutout it is attached to.\n'
+          '   • The <offset> could be any number. It represents the displacement of the space (in ft).',
+    ),
+    CommandDetails(
+      command: '"resize space to <width>"',
+      description:
+          'Changes the width of the selected space to the specified width.\n'
+          '   • The <width> could be any number. It represents the new width of the space (in ft).',
+    ),
+    CommandDetails(
+      command: '"remove space"',
+      description: 'Removes the selected space from the base.',
+    ),
+    CommandDetails(
+      command: '"deselect"',
+      description: 'Deselects the currently selected space.',
+    ),
+  ];
+
+  final List<CommandDetails> miscellaneousCommands = [
+    CommandDetails(
+      command: '"scale <way>"',
+      description: 'Zooms in or out, depending on the <way>.\n'
+          '   • The <way> could be:\n'
+          '       • "in"\n'
+          '       • "out"',
+    ),
+    CommandDetails(
+      command: '"reset scale"',
+      description: 'Resets the zoom level to the default level.',
+    ),
+    CommandDetails(
+      command: '"scale to <level>"',
+      description: 'Changes the zoom level to the specified <level>.\n'
+          '   • The <level> could be any number. It represents the new zoom level.',
+    ),
+    CommandDetails(
+      command: '"deselect"',
+      description: 'Deselects the currently selected element.',
+    ),
+  ];
 
   Widget _buildCommandCategory(String title, IconData icon,
       {bool isSelected = false}) {
@@ -592,6 +726,8 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
 
   List<CommandDetails> _getCurrentCategoryCommands() {
     switch (_selectedCategory) {
+      case 'Miscellaneous Commands':
+        return miscellaneousCommands;
       case 'Base Commands':
         return baseCommands;
       case 'Room Commands':
@@ -614,6 +750,8 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
 
   String _getCurrentCategoryDescription() {
     switch (_selectedCategory) {
+      case 'Miscellaneous Commands':
+        return 'This category contains commands that are not related to the floor plan design itself, but rather to the overall floor plan.';
       case 'Base Commands':
         return 'The \'base\' is the first thing that you will create when creating your floor plan design. There can ONLY be one base per floor in a floor plan design.';
       case 'Room Commands':
@@ -779,6 +917,12 @@ class _VoiceCommandsDialogState extends State<VoiceCommandsDialog> {
                       ),
                       child: ListView(
                         children: [
+                          _buildCommandCategory(
+                            'Miscellaneous Commands',
+                            Icons.more_horiz,
+                            isSelected:
+                                _selectedCategory == 'Miscellaneous Commands',
+                          ),
                           _buildCommandCategory(
                             'Base Commands',
                             Icons.home,
