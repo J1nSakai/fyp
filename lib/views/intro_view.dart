@@ -51,7 +51,7 @@ class _IntroViewState extends State<IntroView> {
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 1400),
                   padding: EdgeInsets.symmetric(
-                    horizontal: MediaQuery.of(context).size.width * 0.05,
+                    horizontal: MediaQuery.sizeOf(context).width * 0.05,
                     vertical: 48,
                   ),
                   child: Column(

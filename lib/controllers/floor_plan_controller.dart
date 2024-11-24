@@ -1173,7 +1173,8 @@ class FloorPlanController extends ChangeNotifier {
     // Check if new dimensions are valid
     if (newWidth <= 0 || newHeight <= 0) {
       Fluttertoast.showToast(
-          msg: "Invalid dimensions. Must be greater than 0.");
+        msg: "Invalid dimensions. Must be greater than 0.",
+      );
       return;
     }
 
@@ -1183,7 +1184,8 @@ class FloorPlanController extends ChangeNotifier {
     // Check if the room would still fit within the base with new dimensions
     if (!_roomFitsWithinBase(newWidth, newHeight, currentPosition)) {
       Fluttertoast.showToast(
-          msg: "New size would place room outside base boundaries");
+        msg: "New size would place room outside base boundaries",
+      );
       return;
     }
 
@@ -1795,6 +1797,58 @@ class FloorPlanController extends ChangeNotifier {
     }
 
     // Create new stairs with rotated dimensions but same up/down direction
+    Stairs rotatedStairs = Stairs(
+      width: newWidth,
+      length: newLength,
+      position: currentStairs.position,
+      direction: directions[newDirectionIndex],
+      numberOfSteps: currentStairs.numberOfSteps,
+      name: currentStairs.name,
+    );
+
+    // Replace old stairs with rotated one
+    _stairs[stairsIndex] = rotatedStairs;
+    selectStairs(rotatedStairs.name);
+    // _saveState();
+    notifyListeners();
+
+    Fluttertoast.showToast(msg: "Stairs rotated successfully");
+  }
+
+  void rotateStairsCounterclockwise() {
+    if (selectedStairs == null) return;
+
+    String stairsName = selectedStairs!.name;
+
+    // Find the stairs by name
+    final stairsIndex =
+        _stairs.indexWhere((stairs) => stairs.name == stairsName);
+
+    if (stairsIndex == -1) {
+      Fluttertoast.showToast(msg: "Stairs not found");
+      return;
+    }
+
+    Stairs currentStairs = _stairs[stairsIndex];
+
+    // For 90-degree rotation, we still swap width and length
+    double newWidth = currentStairs.length;
+    double newLength = currentStairs.width;
+
+    // Check if the stairs with new dimensions would fit and not overlap
+    if (!_canRotateStairs(currentStairs, newWidth, newLength)) {
+      Fluttertoast.showToast(msg: "Cannot rotate stairs - not enough space");
+      return;
+    }
+
+    const List<String> directions = ["up", "right", "down", "left"];
+    // The main difference is here: we subtract 1 instead of adding 1
+    int newDirectionIndex = directions.indexOf(currentStairs.direction) - 1;
+    if (newDirectionIndex < 0) {
+      newDirectionIndex = directions.length - 1;
+    }
+
+    // Create new stairs with rotated dimensions
     Stairs rotatedStairs = Stairs(
       width: newWidth,
       length: newLength,

@@ -161,7 +161,7 @@ class CommandController {
       _handleMoveCommand(tokens, context);
       return;
     } else if (tokens.contains("rotate")) {
-      _handleRotateCommand();
+      _handleRotateCommand(tokens);
       return;
     }
     // Handle room commands
@@ -261,9 +261,13 @@ class CommandController {
       floorPlanController?.removeSelectedSpace();
       return;
     }
-
-    // Handle other remove commands (rooms, base, etc.)
     if (tokens.contains("base")) {
+      if (floorPlanController?.getBase() == null) {
+        MessageService.showMessage(
+            floorManagerController.context, "No base exists.",
+            type: MessageType.error);
+        return;
+      }
       floorPlanController?.removeBase();
       return;
     }
@@ -291,14 +295,35 @@ class CommandController {
 
     if (tokens.contains("cutout") ||
         (tokens.contains("cut") && tokens.contains("out"))) {
+      if (floorPlanController?.selectedCutOut == null) {
+        MessageService.showMessage(
+            floorManagerController.context, "Please select a cutout first",
+            type: MessageType.error);
+        return;
+      }
       floorPlanController?.removeSelectedCutOut();
+      return;
+    }
+
+    if (tokens.contains("stairs")) {
+      if (floorPlanController?.selectedStairs == null) {
+        MessageService.showMessage(
+            floorManagerController.context, "Please select stairs first",
+            type: MessageType.error);
+        return;
+      }
+      floorPlanController?.removeSelectedStairs();
       return;
     }
   }
 
-  void _handleRotateCommand() {
+  void _handleRotateCommand(List<String> tokens) {
     if (floorPlanController?.selectedStairs != null) {
-      floorPlanController?.rotateStairs();
+      if (tokens.contains("left") || tokens.contains("anticlockwise")) {
+        floorPlanController?.rotateStairsCounterclockwise();
+      } else {
+        floorPlanController?.rotateStairs();
+      }
     } else {
       MessageService.showMessage(
           floorManagerController.context, "Select stairs first.",
@@ -349,9 +374,6 @@ class CommandController {
       selectedRoom = floorPlanController
           ?.getRooms()
           .firstWhere((room) => room.name == newName);
-
-      // Remove this line that was deselecting the room
-      // floorPlanController?.deselectRoom();
     } else {
       MessageService.showMessage(
           floorManagerController.context, "Please select a room first.",
