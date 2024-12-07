@@ -158,6 +158,7 @@ class CommandController {
       _handleRenameCommand(tokens);
       return;
     } else if (tokens.contains("move")) {
+      print("move command");
       _handleMoveCommand(tokens, context);
       return;
     } else if (tokens.contains("rotate")) {
@@ -475,6 +476,102 @@ class CommandController {
       MessageService.showMessage(floorManagerController.context,
           "Invalid stairs move command. Try: 'move stairs to center', 'move stairs 5 feet right', 'move stairs to the right of bedroom', 'move stairs to the left of stairs 1'",
           type: MessageType.error);
+    } else if (floorPlanController?.selectedCutOut != null) {
+      print("cutout move command");
+      // Handle cutout movement
+      if (tokens.contains("to")) {
+        // Handle predefined positions for stairs
+        for (String position in [
+          "center",
+          "top",
+          "bottom",
+        ]) {
+          if (tokens.contains(position)) {
+            floorPlanController?.moveCutoutToPosition(
+                position, tokens, context);
+            return;
+          }
+        }
+
+        // Handle relative positioning to rooms or other stairs
+        int referenceRoomIndex = _findReferenceRoomIndex(
+            tokens, floorPlanController?.getRooms() ?? []);
+        int referenceStairsIndex = _findReferenceStairsIndex(tokens);
+        int referenceCutoutIndex = _findReferenceCutoutIndex(tokens);
+
+        if (referenceRoomIndex != -1 ||
+            referenceStairsIndex != -1 ||
+            referenceCutoutIndex != -1) {
+          for (String direction in [
+            "right",
+            "left",
+            "above",
+            "below",
+            "north",
+            "south",
+            "east",
+            "west"
+          ]) {
+            if (tokens.contains(direction)) {
+              if (referenceRoomIndex != -1) {
+                floorPlanController?.moveCutoutRelativeToRoom(
+                    referenceRoomIndex, direction);
+              } else if (referenceCutoutIndex != -1) {
+                floorPlanController?.moveCutoutRelativeToOther(
+                    referenceCutoutIndex, direction);
+              } else if (referenceStairsIndex != -1) {
+                floorPlanController?.moveCutoutRelativeToStairs(
+                    referenceStairsIndex, direction);
+              }
+              return;
+            }
+          }
+        }
+      }
+
+      // Rest of stairs movement handling...
+      double? distance = _extractDistance(tokens);
+      if (distance != null) {
+        for (String direction in [
+          "right",
+          "left",
+          "up",
+          "down",
+          "north",
+          "south",
+          "east",
+          "west"
+        ]) {
+          if (tokens.contains(direction)) {
+            print(
+                "floorPlanController?.moveCutoutRelative(distance, direction);");
+            floorPlanController?.moveCutoutRelative(distance, direction);
+            return;
+          }
+        }
+      }
+
+      // Handle absolute coordinates for cutouts...
+      try {
+        int xIndex = tokens.indexOf("x");
+        int yIndex = tokens.indexOf("y");
+
+        if (xIndex != -1 &&
+            yIndex != -1 &&
+            xIndex + 1 < tokens.length &&
+            yIndex + 1 < tokens.length) {
+          double x = double.parse(tokens[xIndex + 1]);
+          double y = double.parse(tokens[yIndex + 1]);
+          floorPlanController?.moveCutout(x, y);
+          return;
+        }
+      } catch (e) {
+        // Handle parsing errors
+      }
+
+      MessageService.showMessage(floorManagerController.context,
+          "Invalid stairs move command. Try: 'move stairs to center', 'move stairs 5 feet right', 'move stairs to the right of bedroom', 'move stairs to the left of stairs 1'",
+          type: MessageType.error);
     } else if (selectedRoom != null) {
       // Handle room movement
       if (tokens.contains("to")) {
@@ -584,104 +681,9 @@ class CommandController {
       MessageService.showMessage(floorManagerController.context,
           "Invalid room move command. Try: 'move to center', 'move 5 feet right', 'move to the right of bedroom', 'move to the left of stairs 1'",
           type: MessageType.error);
-    } else if (floorPlanController?.selectedCutOut != null) {
-      // Handle cutout movement
-      if (tokens.contains("to")) {
-        // Handle predefined positions for stairs
-        for (String position in [
-          "center",
-          "top",
-          "bottom",
-        ]) {
-          if (tokens.contains(position)) {
-            floorPlanController?.moveCutoutToPosition(
-                position, tokens, context);
-            return;
-          }
-        }
-
-        // Handle relative positioning to rooms or other stairs
-        int referenceRoomIndex = _findReferenceRoomIndex(
-            tokens, floorPlanController?.getRooms() ?? []);
-        int referenceStairsIndex = _findReferenceStairsIndex(tokens);
-        int referenceCutoutIndex = _findReferenceCutoutIndex(tokens);
-
-        if (referenceRoomIndex != -1 ||
-            referenceStairsIndex != -1 ||
-            referenceCutoutIndex != -1) {
-          for (String direction in [
-            "right",
-            "left",
-            "above",
-            "below",
-            "north",
-            "south",
-            "east",
-            "west"
-          ]) {
-            if (tokens.contains(direction)) {
-              if (referenceRoomIndex != -1) {
-                floorPlanController?.moveCutoutRelativeToRoom(
-                    referenceRoomIndex, direction);
-              } else if (referenceCutoutIndex != -1) {
-                floorPlanController?.moveCutoutRelativeToOther(
-                    referenceCutoutIndex, direction);
-              } else if (referenceStairsIndex != -1) {
-                floorPlanController?.moveCutoutRelativeToStairs(
-                    referenceStairsIndex, direction);
-              }
-              return;
-            }
-          }
-        }
-      }
-
-      // Rest of stairs movement handling...
-      double? distance = _extractDistance(tokens);
-      if (distance != null) {
-        for (String direction in [
-          "right",
-          "left",
-          "up",
-          "down",
-          "north",
-          "south",
-          "east",
-          "west"
-        ]) {
-          if (tokens.contains(direction)) {
-            print(
-                "floorPlanController?.moveCutoutRelative(distance, direction);");
-            floorPlanController?.moveCutoutRelative(distance, direction);
-            return;
-          }
-        }
-      }
-
-      // Handle absolute coordinates for stairs...
-      try {
-        int xIndex = tokens.indexOf("x");
-        int yIndex = tokens.indexOf("y");
-
-        if (xIndex != -1 &&
-            yIndex != -1 &&
-            xIndex + 1 < tokens.length &&
-            yIndex + 1 < tokens.length) {
-          double x = double.parse(tokens[xIndex + 1]);
-          double y = double.parse(tokens[yIndex + 1]);
-          floorPlanController?.moveCutout(x, y);
-          return;
-        }
-      } catch (e) {
-        // Handle parsing errors
-      }
-
-      MessageService.showMessage(floorManagerController.context,
-          "Invalid stairs move command. Try: 'move stairs to center', 'move stairs 5 feet right', 'move stairs to the right of bedroom', 'move stairs to the left of stairs 1'",
-          type: MessageType.error);
     } else {
       MessageService.showMessage(floorManagerController.context,
-          "Please select a room or stairs first.",
+          "Please select a room, stairs, or cutout first.",
           type: MessageType.error);
     }
   }
