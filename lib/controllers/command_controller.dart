@@ -15,7 +15,8 @@ class CommandController {
       floorManagerController.getActiveController();
 
   void handleCommand(String command, BuildContext context) {
-    command = command.toLowerCase();
+    command = command.toLowerCase().replaceAll(RegExp(r'[.,!?:()\-\"]'), '');
+    print("Processing command: $command");
     List<String> tokens = command.split(" ");
 
     if (tokens.contains("undo")) {
