@@ -1,16 +1,9 @@
-# saysketch_v2
+# V-Architect
 
-A new Flutter project.
+V-Architect is a voice-first, floor plan creation web app, built to assist people with motor disabilities in creating floor plans.
 
-## Getting Started
+This project was made collaboratively by 3 students of Isra University, Hyderabad, as the Final Year Project.
 
-This project is a starting point for a Flutter application.
+The project is created using Flutter Web Framework.
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
