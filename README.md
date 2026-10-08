@@ -11,8 +11,8 @@ snapping), which is difficult for users with motor impairments. V-Architect
 explores voice as the primary input method.
 
 ## How it works
-The user speaks commands such as [2-3 real example commands from your app].
-Speech is converted to text using [speech-to-text package/API you used], and the
+The user speaks commands such as add a base, select room 1, rename to bedroom, etc.
+Speech is converted to text using speech-to-text package, and the
 text is matched against a **predefined command grammar** that maps phrases to
 floor plan actions (e.g. add a room, place a door).
 
